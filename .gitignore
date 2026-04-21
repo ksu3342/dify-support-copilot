@@ -12,3 +12,5 @@ coverage.xml
 dist/
 build/
 storage/
+data/raw/
+data/clean/

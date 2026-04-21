@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     sqlite_path: str = str(REPO_ROOT / "storage" / "copilot.db")
     sqlite_init_script: str = str(REPO_ROOT / "scripts" / "init_db.sql")
     source_manifest_path: str = str(REPO_ROOT / "data" / "sources.yaml")
+    raw_snapshot_root: str = str(REPO_ROOT / "data" / "raw")
+    clean_snapshot_root: str = str(REPO_ROOT / "data" / "clean")
+    fetch_timeout_seconds: float = 20.0
+    fetch_user_agent: str = "dify-support-copilot/0.2"
     min_evidence_hits: int = 2
     min_score: float = 0.35
     min_score_note: str = "pending calibration"

@@ -30,6 +30,28 @@ This round does not deliver:
 - real ticket routing logic
 - full production behavior
 
+## 2.1 Day 2 Scope
+
+This round adds only the document ingestion minimum loop:
+
+- load `data/sources.yaml`
+- fetch official Dify documentation pages over HTTP
+- persist raw HTML snapshots
+- derive cleaned text
+- upsert snapshot metadata into `document_snapshots`
+
+This round still does not add:
+
+- retrieval
+- chunking
+- embeddings
+- vector store writes
+- LLM calls
+- citation generation
+- clarification logic
+- ticket creation business logic
+- new API endpoints
+
 ## 3. Frozen V1 Main Chain
 
 1. User asks a question
@@ -152,6 +174,16 @@ Rule:
 - stable for the same source manifest version
 - manually bumpable when the manifest or capture procedure changes
 - reproducible because it is explicitly versioned in source control
+
+### 8.3 Day 2 Ingestion Rules
+
+- only fetch URLs listed in `data/sources.yaml`
+- only allow `docs.dify.ai` as the authoritative host
+- use ordinary HTTP fetching, not browser automation
+- store raw HTML under `data/raw/<snapshot_version>/...`
+- store cleaned text under `data/clean/<snapshot_version>/...`
+- generate stable, reproducible `snapshot_id` values from `source_url + snapshot_version`
+- repeated runs for the same `source_url + snapshot_version` must update the same logical snapshot record rather than creating uncontrolled duplicates
 
 ## 9. API Contract
 

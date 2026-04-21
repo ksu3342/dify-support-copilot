@@ -82,6 +82,9 @@ class SnapshotRecord(BaseModel):
     fetched_at: datetime
     content_hash: str
     snapshot_version: str
+    title: Optional[str] = None
+    stored_path: Optional[str] = None
+    created_at: Optional[datetime] = None
 
 
 class SupportAskResponse(BaseModel):

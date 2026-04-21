@@ -74,6 +74,38 @@ Not implemented in this round:
 - Real ticket decision logic
 - Full end-to-end support chain
 
+## Day 2 Delivery
+
+Implemented in this round:
+
+- Real source manifest loading from `data/sources.yaml`
+- Real HTTP fetching for official `docs.dify.ai` pages listed in the manifest
+- Raw HTML snapshots written under `data/raw/<snapshot_version>/...`
+- Cleaned text written under `data/clean/<snapshot_version>/...`
+- Idempotent snapshot metadata upsert into SQLite `document_snapshots`
+- Minimal offline tests for:
+  - source manifest loading
+  - stable snapshot id and path generation
+  - HTML cleaning
+
+Still not implemented in this round:
+
+- retrieval
+- chunking
+- embeddings
+- vector search
+- LLM integration
+- citation generation
+- clarification logic
+- ticket business logic
+
+Run the Day 2 fetch command with:
+
+```powershell
+cd D:\AI agent\dify-support-copilot
+.\.venv\Scripts\python scripts\fetch_sources.py
+```
+
 ## Storage and Retrieval Notes
 
 - SQLite is used for tickets, logs, and metadata.
@@ -96,6 +128,8 @@ Every document snapshot record is expected to keep:
 - `snapshot_version`
 
 For Day 1, `snapshot_version` is sourced from `data/sources.yaml` and treated as a stable manifest version identifier. The actual fetch pipeline is out of scope for this round.
+
+For Day 2, the same `snapshot_version` is used to place raw and cleaned files on disk and to key SQLite snapshot metadata updates.
 
 ## Local Run
 
