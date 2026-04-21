@@ -55,6 +55,8 @@ def _seed_support_documents(sqlite_path: Path) -> None:
                 INSERT INTO document_snapshots (
                     snapshot_id,
                     source_url,
+                    requested_url,
+                    final_url,
                     fetched_at,
                     content_hash,
                     snapshot_version,
@@ -62,10 +64,12 @@ def _seed_support_documents(sqlite_path: Path) -> None:
                     stored_path,
                     created_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     document["snapshot_id"],
+                    document["source_url"],
+                    document["source_url"],
                     document["source_url"],
                     fetched_at,
                     content_hash,

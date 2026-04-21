@@ -60,7 +60,8 @@ def test_build_index_is_idempotent_and_search_hits_expected_source(tmp_path, mon
     for snapshot_id, source_url, title, _, stem in docs:
         upsert_document_snapshot(
             snapshot_id=snapshot_id,
-            source_url=source_url,
+            requested_url=source_url,
+            final_url=source_url,
             fetched_at=datetime.now(timezone.utc),
             content_hash=f"hash-{stem}",
             snapshot_version=snapshot_version,

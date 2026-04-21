@@ -93,6 +93,23 @@ This round still does not add:
 - async worker or queue
 - new frontend or dashboard work
 
+## 2.4 Day 5 Scope
+
+This round adds only data-layer hardening:
+
+- expand the official Dify corpus toward support and troubleshooting coverage
+- record `requested_url` and `final_url` separately for document snapshots
+- reject content drift inside the same `snapshot_version + requested_url`
+- keep repeated same-content fetches idempotent
+
+This round still does not add:
+
+- remote LLM calls
+- embeddings
+- rerank
+- a full historical snapshot version management system
+- changes to the Day 4 support decision rules
+
 ## 3. Frozen V1 Main Chain
 
 1. User asks a question
@@ -208,10 +225,16 @@ Required Day 1 entities:
 
 Each snapshot record must support:
 
+- `requested_url`
+- `final_url`
 - `source_url`
 - `fetched_at`
 - `content_hash`
 - `snapshot_version`
+
+Current runtime note:
+
+- `source_url` is retained as a compatibility alias of `requested_url` for retrieval and existing response shapes
 
 ### 8.2 Snapshot Version Rule
 
@@ -219,7 +242,7 @@ For Day 1, `snapshot_version` is a manifest-level stable identifier stored in `d
 
 Current convention:
 
-- `dify-docs-en-2026-04-21-v1`
+- `dify-docs-en-2026-04-21-v2`
 
 Rule:
 
@@ -234,8 +257,8 @@ Rule:
 - use ordinary HTTP fetching, not browser automation
 - store raw HTML under `data/raw/<snapshot_version>/...`
 - store cleaned text under `data/clean/<snapshot_version>/...`
-- generate stable, reproducible `snapshot_id` values from `source_url + snapshot_version`
-- repeated runs for the same `source_url + snapshot_version` must update the same logical snapshot record rather than creating uncontrolled duplicates
+- generate stable, reproducible `snapshot_id` values from `requested_url + snapshot_version`
+- repeated runs for the same `requested_url + snapshot_version` must update the same logical snapshot record rather than creating uncontrolled duplicates
 
 ### 8.4 Day 3 Chunk and Retrieval Rules
 
@@ -248,8 +271,17 @@ Rule:
 ### 8.5 Snapshot Version Limitation
 
 - `snapshot_version` is still a manifest or batch label
-- it is not yet a content-immutable snapshot identifier
-- this limitation is known and intentionally not solved in Day 4
+- it is not yet a full historical or content-immutable snapshot versioning system
+- this limitation remains known after Day 5
+
+### 8.6 Day 5 Snapshot Hardening Rules
+
+- store `requested_url` and `final_url` separately
+- if there is no redirect, `final_url = requested_url`
+- for the same `snapshot_version + requested_url`:
+  - if `content_hash` is unchanged, allow idempotent update
+  - if `content_hash` changes, reject the write explicitly
+- do not silently overwrite changed content inside the same snapshot version label
 
 ## 9. API Contract
 

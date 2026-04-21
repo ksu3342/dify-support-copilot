@@ -37,6 +37,8 @@ CREATE TABLE IF NOT EXISTS tickets (
 CREATE TABLE IF NOT EXISTS document_snapshots (
     snapshot_id TEXT PRIMARY KEY,
     source_url TEXT NOT NULL,
+    requested_url TEXT NOT NULL,
+    final_url TEXT NOT NULL,
     fetched_at TEXT NOT NULL,
     content_hash TEXT NOT NULL,
     snapshot_version TEXT NOT NULL,

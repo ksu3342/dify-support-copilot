@@ -1,6 +1,6 @@
 product: Dify
 authoritative_language: en
-snapshot_version: dify-docs-en-2026-04-21-v1
+snapshot_version: dify-docs-en-2026-04-21-v2
 pages:
   - url: https://docs.dify.ai/getting-started/install-self-hosted/docker-compose
     category: deployment
@@ -90,3 +90,57 @@ pages:
       - workflow
       - if-else
       - logic
+  - url: https://docs.dify.ai/en/self-host/advanced-deployments/local-source-code
+    category: deployment
+    tags:
+      - self-hosted
+      - source-build
+      - deployment
+  - url: https://docs.dify.ai/en/self-host/troubleshooting/common-issues
+    category: deployment
+    tags:
+      - self-hosted
+      - troubleshooting
+      - common-issues
+  - url: https://docs.dify.ai/en/self-host/troubleshooting/docker-issues
+    category: deployment
+    tags:
+      - docker
+      - troubleshooting
+      - self-hosted
+  - url: https://docs.dify.ai/en/self-host/troubleshooting/integrations
+    category: integration
+    tags:
+      - troubleshooting
+      - integration
+      - self-hosted
+  - url: https://docs.dify.ai/en/self-host/troubleshooting/storage-and-migration
+    category: deployment
+    tags:
+      - storage
+      - migration
+      - self-hosted
+  - url: https://docs.dify.ai/en/self-host/troubleshooting/weaviate-v4-migration
+    category: deployment
+    tags:
+      - migration
+      - weaviate
+      - troubleshooting
+  - url: https://docs.dify.ai/en/develop-plugin/dev-guides-and-walkthroughs/tool-oauth
+    category: integration
+    tags:
+      - plugin
+      - oauth
+      - integration
+  - url: https://docs.dify.ai/en/develop-plugin/dev-guides-and-walkthroughs/trigger-plugin
+    category: integration
+    tags:
+      - plugin
+      - trigger
+      - integration
+  - url: https://docs.dify.ai/en/use-dify/nodes/trigger/webhook-trigger
+    category: integration
+    tags:
+      - webhook
+      - trigger
+      - integration

@@ -11,9 +11,14 @@ from urllib.parse import urlparse
 import httpx
 import yaml
 
-from app.core.config import REPO_ROOT, Settings
+from app.core.config import Settings
 from app.ingest.clean import extract_title_and_clean_text
-from app.models.db import count_document_snapshots, init_db, upsert_document_snapshot
+from app.models.db import (
+    count_document_snapshots,
+    get_document_snapshot_by_requested_url,
+    init_db,
+    upsert_document_snapshot,
+)
 
 
 @dataclass(frozen=True)
@@ -64,6 +69,10 @@ class FetchSummary:
     sqlite_rows_for_snapshot_version: int
 
 
+class SnapshotConflictError(RuntimeError):
+    pass
+
+
 def load_source_manifest(manifest_path: Path) -> SourceManifest:
     payload = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
     pages = [
@@ -82,10 +91,15 @@ def load_source_manifest(manifest_path: Path) -> SourceManifest:
     )
 
 
-def build_snapshot_paths(repo_root: Path, snapshot_version: str, source_url: str) -> SnapshotPaths:
+def build_snapshot_paths(
+    raw_snapshot_root: Path,
+    clean_snapshot_root: Path,
+    snapshot_version: str,
+    source_url: str,
+) -> SnapshotPaths:
     parsed = urlparse(source_url)
-    raw_root = repo_root / "data" / "raw" / snapshot_version
-    clean_root = repo_root / "data" / "clean" / snapshot_version
+    raw_root = raw_snapshot_root / snapshot_version
+    clean_root = clean_snapshot_root / snapshot_version
 
     sanitized_parts = [_sanitize_path_part(part) for part in parsed.path.split("/") if part]
     if not sanitized_parts:
@@ -130,21 +144,36 @@ def fetch_all_sources(settings: Settings) -> FetchSummary:
         headers={"User-Agent": settings.fetch_user_agent},
     ) as client:
         for page in manifest.pages:
-            results.append(
-                _fetch_single_page(
-                    client=client,
-                    settings=settings,
-                    snapshot_version=manifest.snapshot_version,
-                    source_url=page.url,
+            try:
+                results.append(
+                    _fetch_single_page(
+                        client=client,
+                        settings=settings,
+                        snapshot_version=manifest.snapshot_version,
+                        source_url=page.url,
+                    )
                 )
-            )
+            except SnapshotConflictError as exc:
+                results.append(
+                    PageFetchResult(
+                        source_url=page.url,
+                        snapshot_id=None,
+                        success=False,
+                        title=None,
+                        raw_path=None,
+                        clean_path=None,
+                        content_hash=None,
+                        error=str(exc),
+                    )
+                )
+                break
 
     failures = [result for result in results if not result.success]
     success_count = sum(1 for result in results if result.success)
 
     return FetchSummary(
         snapshot_version=manifest.snapshot_version,
-        total_pages=len(results),
+        total_pages=len(manifest.pages),
         success_count=success_count,
         failure_count=len(failures),
         failures=failures,
@@ -164,13 +193,25 @@ def _fetch_single_page(
         _validate_source_url(source_url)
         response = client.get(source_url)
         response.raise_for_status()
-        _validate_source_url(str(response.url))
+        final_url = str(response.url)
+        _validate_source_url(final_url)
 
         html = response.text
         title, cleaned_text = extract_title_and_clean_text(html)
         fetched_at = datetime.now(timezone.utc)
         content_hash = hashlib.sha256(html.encode("utf-8")).hexdigest()
-        paths = build_snapshot_paths(REPO_ROOT, snapshot_version, source_url)
+        _assert_snapshot_is_reproducible(
+            requested_url=source_url,
+            snapshot_version=snapshot_version,
+            content_hash=content_hash,
+            sqlite_path=settings.sqlite_path,
+        )
+        paths = build_snapshot_paths(
+            raw_snapshot_root=Path(settings.raw_snapshot_root),
+            clean_snapshot_root=Path(settings.clean_snapshot_root),
+            snapshot_version=snapshot_version,
+            source_url=source_url,
+        )
 
         paths.raw_absolute_path.parent.mkdir(parents=True, exist_ok=True)
         paths.clean_absolute_path.parent.mkdir(parents=True, exist_ok=True)
@@ -179,7 +220,8 @@ def _fetch_single_page(
 
         upsert_document_snapshot(
             snapshot_id=paths.snapshot_id,
-            source_url=source_url,
+            requested_url=source_url,
+            final_url=final_url,
             fetched_at=fetched_at,
             content_hash=content_hash,
             snapshot_version=snapshot_version,
@@ -197,6 +239,8 @@ def _fetch_single_page(
             content_hash=content_hash,
             error=None,
         )
+    except SnapshotConflictError:
+        raise
     except Exception as exc:
         return PageFetchResult(
             source_url=source_url,
@@ -221,3 +265,25 @@ def _validate_source_url(source_url: str) -> None:
         raise ValueError(f"Unsupported URL scheme for source: {source_url}")
     if parsed.netloc != "docs.dify.ai":
         raise ValueError(f"Non-authoritative host is not allowed: {source_url}")
+
+
+def _assert_snapshot_is_reproducible(
+    requested_url: str,
+    snapshot_version: str,
+    content_hash: str,
+    sqlite_path: str,
+) -> None:
+    existing_snapshot = get_document_snapshot_by_requested_url(
+        requested_url=requested_url,
+        snapshot_version=snapshot_version,
+        sqlite_path=sqlite_path,
+    )
+    if existing_snapshot is None or existing_snapshot.content_hash == content_hash:
+        return
+
+    raise SnapshotConflictError(
+        "Snapshot content drift detected for "
+        f"snapshot_version='{snapshot_version}' and requested_url='{requested_url}'. "
+        f"existing_hash='{existing_snapshot.content_hash}' new_hash='{content_hash}'. "
+        "Refusing to overwrite the existing snapshot."
+    )

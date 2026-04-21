@@ -46,6 +46,7 @@ def init_db(sqlite_path: str, init_script_path: str) -> None:
     script = Path(init_script_path).read_text(encoding="utf-8")
     with _connect(sqlite_path) as connection:
         connection.executescript(script)
+        _apply_migrations(connection)
         connection.commit()
 
 
@@ -222,7 +223,8 @@ def insert_retrieval_hits(
 
 def upsert_document_snapshot(
     snapshot_id: str,
-    source_url: str,
+    requested_url: str,
+    final_url: str,
     fetched_at: datetime,
     content_hash: str,
     snapshot_version: str,
@@ -249,6 +251,8 @@ def upsert_document_snapshot(
             INSERT INTO document_snapshots (
                 snapshot_id,
                 source_url,
+                requested_url,
+                final_url,
                 fetched_at,
                 content_hash,
                 snapshot_version,
@@ -256,9 +260,11 @@ def upsert_document_snapshot(
                 stored_path,
                 created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(snapshot_id) DO UPDATE SET
                 source_url = excluded.source_url,
+                requested_url = excluded.requested_url,
+                final_url = excluded.final_url,
                 fetched_at = excluded.fetched_at,
                 content_hash = excluded.content_hash,
                 snapshot_version = excluded.snapshot_version,
@@ -267,7 +273,9 @@ def upsert_document_snapshot(
             """,
             (
                 snapshot_id,
-                source_url,
+                requested_url,
+                requested_url,
+                final_url,
                 fetched_at_value,
                 content_hash,
                 snapshot_version,
@@ -285,7 +293,17 @@ def get_document_snapshot(snapshot_id: str, sqlite_path: Optional[str] = None) -
     with _connect(target_db) as connection:
         row = connection.execute(
             """
-            SELECT snapshot_id, source_url, fetched_at, content_hash, snapshot_version, title, stored_path, created_at
+            SELECT
+                snapshot_id,
+                source_url,
+                COALESCE(requested_url, source_url) AS requested_url,
+                COALESCE(final_url, requested_url, source_url) AS final_url,
+                fetched_at,
+                content_hash,
+                snapshot_version,
+                title,
+                stored_path,
+                created_at
             FROM document_snapshots
             WHERE snapshot_id = ?
             """,
@@ -293,16 +311,38 @@ def get_document_snapshot(snapshot_id: str, sqlite_path: Optional[str] = None) -
         ).fetchone()
     if row is None:
         return None
-    return SnapshotRecord(
-        snapshot_id=row["snapshot_id"],
-        source_url=row["source_url"],
-        fetched_at=datetime.fromisoformat(row["fetched_at"]),
-        content_hash=row["content_hash"],
-        snapshot_version=row["snapshot_version"],
-        title=row["title"],
-        stored_path=row["stored_path"],
-        created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else None,
-    )
+    return _snapshot_row_to_record(row)
+
+
+def get_document_snapshot_by_requested_url(
+    requested_url: str,
+    snapshot_version: str,
+    sqlite_path: Optional[str] = None,
+) -> Optional[SnapshotRecord]:
+    target_db = sqlite_path or _default_sqlite_path()
+    with _connect(target_db) as connection:
+        row = connection.execute(
+            """
+            SELECT
+                snapshot_id,
+                source_url,
+                COALESCE(requested_url, source_url) AS requested_url,
+                COALESCE(final_url, requested_url, source_url) AS final_url,
+                fetched_at,
+                content_hash,
+                snapshot_version,
+                title,
+                stored_path,
+                created_at
+            FROM document_snapshots
+            WHERE snapshot_version = ?
+              AND COALESCE(requested_url, source_url) = ?
+            """,
+            (snapshot_version, requested_url),
+        ).fetchone()
+    if row is None:
+        return None
+    return _snapshot_row_to_record(row)
 
 
 def count_document_snapshots(snapshot_version: Optional[str] = None, sqlite_path: Optional[str] = None) -> int:
@@ -322,26 +362,24 @@ def list_document_snapshots(snapshot_version: str, sqlite_path: Optional[str] = 
     with _connect(target_db) as connection:
         rows = connection.execute(
             """
-            SELECT snapshot_id, source_url, fetched_at, content_hash, snapshot_version, title, stored_path, created_at
+            SELECT
+                snapshot_id,
+                source_url,
+                COALESCE(requested_url, source_url) AS requested_url,
+                COALESCE(final_url, requested_url, source_url) AS final_url,
+                fetched_at,
+                content_hash,
+                snapshot_version,
+                title,
+                stored_path,
+                created_at
             FROM document_snapshots
             WHERE snapshot_version = ?
-            ORDER BY source_url
+            ORDER BY COALESCE(requested_url, source_url)
             """,
             (snapshot_version,),
         ).fetchall()
-    return [
-        SnapshotRecord(
-            snapshot_id=row["snapshot_id"],
-            source_url=row["source_url"],
-            fetched_at=datetime.fromisoformat(row["fetched_at"]),
-            content_hash=row["content_hash"],
-            snapshot_version=row["snapshot_version"],
-            title=row["title"],
-            stored_path=row["stored_path"],
-            created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else None,
-        )
-        for row in rows
-    ]
+    return [_snapshot_row_to_record(row) for row in rows]
 
 
 def count_document_chunks(snapshot_version: Optional[str] = None, sqlite_path: Optional[str] = None) -> int:
@@ -379,3 +417,65 @@ def _default_sqlite_path() -> str:
     from app.core.config import get_settings
 
     return get_settings().sqlite_path
+
+
+def _apply_migrations(connection: sqlite3.Connection) -> None:
+    _ensure_document_snapshot_schema(connection)
+
+
+def _ensure_document_snapshot_schema(connection: sqlite3.Connection) -> None:
+    columns = _table_columns(connection, "document_snapshots")
+    if not columns:
+        return
+
+    if "requested_url" not in columns:
+        connection.execute("ALTER TABLE document_snapshots ADD COLUMN requested_url TEXT")
+    if "final_url" not in columns:
+        connection.execute("ALTER TABLE document_snapshots ADD COLUMN final_url TEXT")
+
+    connection.execute(
+        """
+        UPDATE document_snapshots
+        SET requested_url = COALESCE(requested_url, source_url)
+        WHERE requested_url IS NULL OR requested_url = ''
+        """
+    )
+    connection.execute(
+        """
+        UPDATE document_snapshots
+        SET final_url = COALESCE(final_url, requested_url, source_url)
+        WHERE final_url IS NULL OR final_url = ''
+        """
+    )
+    connection.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_document_snapshots_requested_version
+            ON document_snapshots (snapshot_version, requested_url)
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_document_snapshots_final_version
+            ON document_snapshots (snapshot_version, final_url)
+        """
+    )
+
+
+def _table_columns(connection: sqlite3.Connection, table_name: str) -> set[str]:
+    rows = connection.execute(f"PRAGMA table_info({table_name})").fetchall()
+    return {str(row["name"]) for row in rows}
+
+
+def _snapshot_row_to_record(row: sqlite3.Row) -> SnapshotRecord:
+    return SnapshotRecord(
+        snapshot_id=row["snapshot_id"],
+        source_url=row["source_url"],
+        requested_url=row["requested_url"],
+        final_url=row["final_url"],
+        fetched_at=datetime.fromisoformat(row["fetched_at"]),
+        content_hash=row["content_hash"],
+        snapshot_version=row["snapshot_version"],
+        title=row["title"],
+        stored_path=row["stored_path"],
+        created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else None,
+    )

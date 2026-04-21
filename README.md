@@ -163,6 +163,32 @@ Current limitation:
 
 - `snapshot_version` is still a manifest or batch label. It is not yet a content-immutable snapshot version.
 
+## Day 5 Delivery
+
+Implemented in this round:
+
+- Expanded `data/sources.yaml` from 15 to 24 official `docs.dify.ai` English pages
+- Added higher-support-value corpus coverage for:
+  - self-host troubleshooting
+  - Docker issues
+  - storage and migration
+  - Weaviate migration
+  - plugin OAuth and trigger integration support
+- `document_snapshots` now records both:
+  - `requested_url`
+  - `final_url`
+- `source_url` is retained as a compatibility alias of `requested_url` for the current retrieval pipeline
+- Repeated fetches for the same `snapshot_version + requested_url` are now:
+  - idempotent when `content_hash` is unchanged
+  - explicitly rejected when `content_hash` changes
+- Existing SQLite databases are upgraded in place by the repo's minimal schema migration path during `init_db()`
+
+Still not implemented in this round:
+
+- a full immutable historical snapshot versioning system
+- historical diff tracking across snapshot versions
+- any remote-model or embedding-based data pipeline
+
 Run the Day 2 fetch command with:
 
 ```powershell
@@ -187,6 +213,8 @@ cd D:\AI agent\dify-support-copilot
 
 Every document snapshot record is expected to keep:
 
+- `requested_url`
+- `final_url`
 - `source_url`
 - `fetched_at`
 - `content_hash`
@@ -195,6 +223,12 @@ Every document snapshot record is expected to keep:
 For Day 1, `snapshot_version` is sourced from `data/sources.yaml` and treated as a stable manifest version identifier. The actual fetch pipeline is out of scope for this round.
 
 For Day 2, the same `snapshot_version` is used to place raw and cleaned files on disk and to key SQLite snapshot metadata updates.
+
+For Day 5, `snapshot_version` is still a manifest or batch label rather than a full immutable history identifier. The hardening added in Day 5 is narrower and more conservative:
+
+- `requested_url` and `final_url` are stored separately
+- repeated fetches with the same content are allowed
+- repeated fetches with changed content under the same `snapshot_version + requested_url` are rejected instead of silently overwriting
 
 ## Local Run
 

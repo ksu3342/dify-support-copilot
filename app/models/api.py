@@ -82,6 +82,8 @@ class TicketRecord(BaseModel):
 class SnapshotRecord(BaseModel):
     snapshot_id: str
     source_url: str
+    requested_url: str
+    final_url: str
     fetched_at: datetime
     content_hash: str
     snapshot_version: str
