@@ -52,6 +52,27 @@ This round still does not add:
 - ticket creation business logic
 - new API endpoints
 
+## 2.2 Day 3 Scope
+
+This round adds only the minimum local retrieval loop:
+
+- read cleaned text from `data/clean/<snapshot_version>/...`
+- create deterministic chunks
+- persist chunk metadata into SQLite
+- build a minimal local retrieval index
+- expose CLI-only search over indexed chunks
+
+This round still does not add:
+
+- LLM calls
+- classification
+- answer generation
+- citation assembly APIs
+- clarification logic
+- ticket business logic
+- external embedding services
+- multi-vector-store support
+
 ## 3. Frozen V1 Main Chain
 
 1. User asks a question
@@ -184,6 +205,14 @@ Rule:
 - store cleaned text under `data/clean/<snapshot_version>/...`
 - generate stable, reproducible `snapshot_id` values from `source_url + snapshot_version`
 - repeated runs for the same `source_url + snapshot_version` must update the same logical snapshot record rather than creating uncontrolled duplicates
+
+### 8.4 Day 3 Chunk and Retrieval Rules
+
+- chunking must be deterministic and reproducible
+- chunk ids must be stable for the same `snapshot_version + source_url + chunk_index`
+- repeated indexing for the same snapshot version must not create uncontrolled duplicate chunk rows
+- Day 3 retrieval is a minimal local retrieval step implemented with SQLite FTS5 when available
+- if SQLite FTS5 is unavailable, retrieval may fall back to a repository-local lexical implementation without introducing heavyweight frameworks
 
 ## 9. API Contract
 

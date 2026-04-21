@@ -99,6 +99,25 @@ Still not implemented in this round:
 - clarification logic
 - ticket business logic
 
+## Day 3 Delivery
+
+Implemented in this round:
+
+- Deterministic chunking over cleaned text
+- Minimal local retrieval index using SQLite FTS5
+- Chunk metadata persisted in SQLite `document_chunks`
+- CLI commands for index build and search:
+  - `.\.venv\Scripts\python scripts\build_index.py`
+  - `.\.venv\Scripts\python scripts\search_chunks.py --query "docker compose self hosted install" --top-k 5`
+
+Still not implemented in this round:
+
+- LLM-based classification
+- citation answer generation
+- clarification logic
+- ticket business logic
+- external embeddings or vector database integration
+
 Run the Day 2 fetch command with:
 
 ```powershell
@@ -111,6 +130,7 @@ cd D:\AI agent\dify-support-copilot
 - SQLite is used for tickets, logs, and metadata.
 - Retrieval is specified only as a `lightweight local vector store`.
 - No specific vector store is treated as a product-level commitment in the spec.
+- Day 3 local retrieval uses SQLite FTS5 as a minimal, repo-local indexing step. This is a bootstrap retrieval mechanism, not a claim that full RAG is complete.
 
 ## Threshold Notes
 

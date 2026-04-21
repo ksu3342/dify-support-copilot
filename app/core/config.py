@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     clean_snapshot_root: str = str(REPO_ROOT / "data" / "clean")
     fetch_timeout_seconds: float = 20.0
     fetch_user_agent: str = "dify-support-copilot/0.2"
+    chunk_target_chars: int = 1000
+    chunk_min_chars: int = 400
     min_evidence_hits: int = 2
     min_score: float = 0.35
     min_score_note: str = "pending calibration"

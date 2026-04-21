@@ -45,6 +45,20 @@ CREATE TABLE IF NOT EXISTS document_snapshots (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS document_chunks (
+    chunk_id TEXT PRIMARY KEY,
+    snapshot_id TEXT NOT NULL,
+    source_url TEXT NOT NULL,
+    snapshot_version TEXT NOT NULL,
+    title TEXT,
+    chunk_index INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    char_count INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (snapshot_id) REFERENCES document_snapshots (snapshot_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_support_runs_created_at
     ON support_runs (created_at);
 
@@ -56,3 +70,9 @@ CREATE INDEX IF NOT EXISTS idx_tickets_run_id
 
 CREATE INDEX IF NOT EXISTS idx_document_snapshots_source_version
     ON document_snapshots (source_url, snapshot_version);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_document_chunks_source_position
+    ON document_chunks (snapshot_version, source_url, chunk_index);
+
+CREATE INDEX IF NOT EXISTS idx_document_chunks_snapshot_version
+    ON document_chunks (snapshot_version);

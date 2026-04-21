@@ -2,7 +2,7 @@ import json
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from app.models.api import Category, RunRecord, RunStatus, SnapshotRecord, TicketRecord, TicketStatus
@@ -204,6 +204,45 @@ def get_document_snapshot(snapshot_id: str, sqlite_path: Optional[str] = None) -
 def count_document_snapshots(snapshot_version: Optional[str] = None, sqlite_path: Optional[str] = None) -> int:
     target_db = sqlite_path or _default_sqlite_path()
     query = "SELECT COUNT(*) AS total FROM document_snapshots"
+    parameters: tuple[str, ...] = ()
+    if snapshot_version is not None:
+        query += " WHERE snapshot_version = ?"
+        parameters = (snapshot_version,)
+    with _connect(target_db) as connection:
+        row = connection.execute(query, parameters).fetchone()
+    return int(row["total"]) if row is not None else 0
+
+
+def list_document_snapshots(snapshot_version: str, sqlite_path: Optional[str] = None) -> List[SnapshotRecord]:
+    target_db = sqlite_path or _default_sqlite_path()
+    with _connect(target_db) as connection:
+        rows = connection.execute(
+            """
+            SELECT snapshot_id, source_url, fetched_at, content_hash, snapshot_version, title, stored_path, created_at
+            FROM document_snapshots
+            WHERE snapshot_version = ?
+            ORDER BY source_url
+            """,
+            (snapshot_version,),
+        ).fetchall()
+    return [
+        SnapshotRecord(
+            snapshot_id=row["snapshot_id"],
+            source_url=row["source_url"],
+            fetched_at=datetime.fromisoformat(row["fetched_at"]),
+            content_hash=row["content_hash"],
+            snapshot_version=row["snapshot_version"],
+            title=row["title"],
+            stored_path=row["stored_path"],
+            created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else None,
+        )
+        for row in rows
+    ]
+
+
+def count_document_chunks(snapshot_version: Optional[str] = None, sqlite_path: Optional[str] = None) -> int:
+    target_db = sqlite_path or _default_sqlite_path()
+    query = "SELECT COUNT(*) AS total FROM document_chunks"
     parameters: tuple[str, ...] = ()
     if snapshot_version is not None:
         query += " WHERE snapshot_version = ?"
