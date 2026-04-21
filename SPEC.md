@@ -127,6 +127,21 @@ This round still does not add:
 - online evaluation infrastructure
 - changes to the Day 4 support API contract
 
+## 2.6 Day 7 Scope
+
+This round adds only a minimal deterministic rule hardening step:
+
+- reduce false optimistic answers for vague `knowledge-base` and `integration` problem reports
+- prefer clarification first for complaint-style queries with insufficient diagnostics
+- escalate to ticket on follow-up when the missing diagnostic detail is still not supplied
+
+This round still does not add:
+
+- remote LLM calls
+- retrieval backend changes
+- threshold changes
+- new API fields or endpoints
+
 ## 3. Frozen V1 Main Chain
 
 1. User asks a question
@@ -220,6 +235,7 @@ The following subsections describe the intended V1 product boundary. They are no
 - `answer generation`: retrieval-backed extractive assembly, not remote-model generation
 - `clarification question`: rules-generated text, not remote-model generation
 - `ticket creation`: structured SQLite write
+- Day 7 rule hardening adds complaint-style clarification for vague `knowledge-base` and `integration` issue reports
 
 ## 7. Retrieval and Threshold Rules
 

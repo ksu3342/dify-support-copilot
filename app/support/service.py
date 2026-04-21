@@ -38,6 +38,37 @@ GENERIC_FOLLOW_UP_SLOTS = {
     Category.INTEGRATION: [SlotName.ERROR_MESSAGE, SlotName.ENVIRONMENT],
 }
 
+GUIDANCE_QUERY_PHRASES = (
+    "how do i",
+    "how can i",
+    "what is",
+    "explain",
+    "show me",
+    "guide",
+    "setup",
+    "set up",
+    "configure",
+    "develop",
+    "add oauth support",
+    "test retrieval",
+)
+
+PROBLEM_REPORT_PHRASES = (
+    "not working",
+    "broken",
+    "bad",
+    "fails",
+    "failing",
+    "issue",
+    "issues",
+    "error",
+    "not searchable",
+    "search is bad",
+    "integration is broken",
+    "api is broken",
+    "wrong",
+)
+
 
 @dataclass(frozen=True)
 class ClassificationResult:
@@ -348,7 +379,13 @@ def _decide_support_outcome(
         )
 
     missing_slots = _missing_slots(resolved_slots)
-    needs_slot_clarification = category in {Category.DEPLOYMENT, Category.CONFIGURATION} and len(missing_slots) >= 2
+    needs_slot_clarification = (
+        category in {Category.DEPLOYMENT, Category.CONFIGURATION} and len(missing_slots) >= 2
+    ) or _needs_non_deployment_clarification(
+        category=category,
+        resolved_question=resolved_question,
+        resolved_slots=resolved_slots,
+    )
     evidence_count = len(retrieval_results)
     top_score = retrieval_results[0].score if retrieval_results else 0.0
     insufficient_evidence = evidence_count < settings.min_evidence_hits or top_score < settings.min_score
@@ -432,6 +469,36 @@ def _missing_slots(slots: SupportSlots) -> List[SlotName]:
         SlotName.ENVIRONMENT: slots.environment,
     }
     return [name for name, value in mapping.items() if not value]
+
+
+def _needs_non_deployment_clarification(
+    category: Category,
+    resolved_question: str,
+    resolved_slots: SupportSlots,
+) -> bool:
+    if category not in {Category.KNOWLEDGE_BASE, Category.INTEGRATION}:
+        return False
+    if not _is_problem_report_query(resolved_question):
+        return False
+
+    provided_diagnostic_fields = sum(
+        1
+        for value in (
+            resolved_slots.deployment_method,
+            resolved_slots.version,
+            resolved_slots.error_message,
+            resolved_slots.environment,
+        )
+        if value
+    )
+    return provided_diagnostic_fields < 2
+
+
+def _is_problem_report_query(question: str) -> bool:
+    normalized = question.lower()
+    if any(phrase in normalized for phrase in GUIDANCE_QUERY_PHRASES):
+        return False
+    return any(phrase in normalized for phrase in PROBLEM_REPORT_PHRASES)
 
 
 def _build_clarification_question(category: Category, missing_slots: List[SlotName]) -> str:

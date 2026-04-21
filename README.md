@@ -212,6 +212,19 @@ Current limitation:
 
 - Day 6 adds a local replay-eval baseline, not an online evaluation system and not a model upgrade
 
+## Day 7 Delivery
+
+Implemented in this round:
+
+- Hardened the deterministic support decision rules for `knowledge-base` and `integration`
+- Vague problem-report queries in those categories now clarify first instead of answering optimistically
+- If the follow-up still does not add enough diagnostic detail, the request escalates to `ticket_created`
+
+Current rule boundary:
+
+- how-to / guide-style questions still remain eligible for `answered`
+- vague complaint-style questions now prefer `needs_clarification`
+
 Run the Day 2 fetch command with:
 
 ```powershell
