@@ -110,6 +110,23 @@ This round still does not add:
 - a full historical snapshot version management system
 - changes to the Day 4 support decision rules
 
+## 2.5 Day 6 Scope
+
+This round adds only replay evaluation and threshold review:
+
+- tracked support replay cases
+- a repo-local replay eval runner
+- preflight validation against the current local corpus
+- replay-based review of the `MIN_SCORE` threshold
+
+This round still does not add:
+
+- remote LLM calls
+- new product capabilities
+- a full experiment tracking system
+- online evaluation infrastructure
+- changes to the Day 4 support API contract
+
 ## 3. Frozen V1 Main Chain
 
 1. User asks a question
@@ -208,7 +225,16 @@ The following subsections describe the intended V1 product boundary. They are no
 
 - `MIN_EVIDENCE_HITS = 2`
 - `MIN_SCORE` is a configurable threshold
-- Any default `MIN_SCORE` value before Day 6 replay evaluation is placeholder-only and must be treated as `pending calibration`
+- Day 6 replay sweep reviewed `MIN_SCORE` at:
+  - `0.20`
+  - `0.25`
+  - `0.30`
+  - `0.35`
+  - `0.40`
+  - `0.45`
+- The replay sweep did not produce a safer or more accurate alternative to the current default
+- The default `MIN_SCORE` therefore remains `0.35`
+- This is a replay-calibrated local baseline, not a claim of production-grade threshold tuning
 
 ## 8. Data Model Requirements
 
@@ -280,8 +306,16 @@ Rule:
 - if there is no redirect, `final_url = requested_url`
 - for the same `snapshot_version + requested_url`:
   - if `content_hash` is unchanged, allow idempotent update
-  - if `content_hash` changes, reject the write explicitly
+- if `content_hash` changes, reject the write explicitly
 - do not silently overwrite changed content inside the same snapshot version label
+
+### 8.7 Day 6 Replay Eval Rules
+
+- replay eval cases are tracked in source control
+- replay eval must run against the current local Dify corpus for the current manifest snapshot version
+- replay eval must fail fast when snapshots or chunks are missing
+- replay eval must reuse the current support decision chain instead of mocking its outputs
+- replay eval is a local reproducible behavior baseline, not a replacement for engineering tests
 
 ## 9. API Contract
 

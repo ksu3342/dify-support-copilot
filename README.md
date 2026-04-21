@@ -189,6 +189,29 @@ Still not implemented in this round:
 - historical diff tracking across snapshot versions
 - any remote-model or embedding-based data pipeline
 
+## Day 6 Delivery
+
+Implemented in this round:
+
+- Added tracked replay eval cases at `data/evals/support_eval_v1.yaml`
+- Added a replay eval runner at `scripts/run_eval.py`
+- Replay eval runs against the current local Dify corpus after a preflight check for:
+  - current `snapshot_version`
+  - `document_snapshots`
+  - `document_chunks`
+- Replay eval reports:
+  - status accuracy
+  - category accuracy
+  - answered citation hit rate
+  - clarification slot match rate
+  - ticket path pass rate
+- Current `min_score` remains `0.35`
+- Day 6 replay sweep over `0.20` to `0.45` did not improve the false-answered cases, so the default threshold was retained
+
+Current limitation:
+
+- Day 6 adds a local replay-eval baseline, not an online evaluation system and not a model upgrade
+
 Run the Day 2 fetch command with:
 
 ```powershell
@@ -206,8 +229,9 @@ cd D:\AI agent\dify-support-copilot
 ## Threshold Notes
 
 - `MIN_EVIDENCE_HITS = 2` is reserved in the spec.
-- `MIN_SCORE` is configurable and marked as `pending calibration`.
-- Any default value in config is a placeholder, not a validated constant.
+- `MIN_SCORE` is configurable.
+- Day 6 replay sweep over `0.20`, `0.25`, `0.30`, `0.35`, `0.40`, and `0.45` did not change the replay failures, so the default remains `0.35`.
+- The remaining false-answered cases come from retrieval and deterministic decision behavior that this sweep did not move.
 
 ## Document Snapshot Versioning
 
@@ -256,6 +280,16 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/v1/support/ask -Conten
 cd D:\AI agent\dify-support-copilot
 .venv\Scripts\python -m pytest
 ```
+
+Replay eval:
+
+```powershell
+cd D:\AI agent\dify-support-copilot
+.\.venv\Scripts\python scripts\run_eval.py
+.\.venv\Scripts\python scripts\run_eval.py --min-score 0.45
+```
+
+Replay eval artifacts are written under `storage/evals/`.
 
 Integration tests are self-contained:
 

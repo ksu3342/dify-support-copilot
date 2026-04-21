@@ -1,0 +1,180 @@
+suite_id: support_eval_v1
+target_snapshot_version: dify-docs-en-2026-04-21-v2
+cases:
+  - case_id: dep_answer_docker_issues
+    category: deployment
+    type: single_turn
+    question: Using docker compose on Ubuntu with Dify v1.0.0, how do I troubleshoot Docker issues after reboot?
+    expected_status: answered
+    required_source_urls:
+      - https://docs.dify.ai/en/self-host/troubleshooting/docker-issues
+    notes: Expected to ground the answer in the official Docker issues troubleshooting page.
+
+  - case_id: dep_answer_storage_migration
+    category: deployment
+    type: single_turn
+    question: Using docker compose on Ubuntu with Dify v1.0.0, how do I migrate storage from Weaviate?
+    expected_status: answered
+    required_source_urls:
+      - https://docs.dify.ai/en/self-host/troubleshooting/weaviate-v4-migration
+    notes: Support-style migration question tied to the Weaviate migration guide.
+
+  - case_id: dep_clarify_upgrade_failure
+    category: deployment
+    type: single_turn
+    question: My docker compose upgrade fails after restart.
+    expected_status: needs_clarification
+    expected_missing_slots:
+      - version
+      - environment
+    notes: Deployment failures without version or environment should clarify first.
+
+  - case_id: dep_ticket_after_follow_up
+    category: deployment
+    type: two_turn
+    initial_question: My docker compose deployment fails during install.
+    expected_initial_status: needs_clarification
+    expected_missing_slots:
+      - version
+      - environment
+    follow_up_question: Still failing after retry.
+    expected_follow_up_status: ticket_created
+    notes: One clarification is allowed; a second insufficient pass should escalate.
+
+  - case_id: cfg_answer_question_classifier
+    category: configuration
+    type: single_turn
+    question: Using docker compose on Ubuntu with Dify v1.0.0, how do I configure the question classifier node?
+    expected_status: answered
+    required_source_urls:
+      - https://docs.dify.ai/en/guides/workflow/node/question-classifier
+    notes: Configuration answer should cite the question classifier node guide.
+
+  - case_id: cfg_answer_model_providers
+    category: configuration
+    type: single_turn
+    question: Using docker compose on Ubuntu with Dify v1.0.0, how do I configure model schema for providers?
+    expected_status: answered
+    required_source_urls:
+      - https://docs.dify.ai/en/guides/model-configuration/schema
+    notes: Configuration answer should cite the model provider schema documentation.
+
+  - case_id: cfg_clarify_question_classifier
+    category: configuration
+    type: single_turn
+    question: How do I configure the question classifier in Dify?
+    expected_status: needs_clarification
+    expected_missing_slots:
+      - deployment_method
+      - version
+      - error_message
+      - environment
+    notes: Configuration questions with no environment details should request the fixed slots.
+
+  - case_id: cfg_ticket_after_follow_up
+    category: configuration
+    type: two_turn
+    initial_question: How do I configure model providers in Dify?
+    expected_initial_status: needs_clarification
+    expected_missing_slots:
+      - deployment_method
+      - version
+      - error_message
+      - environment
+    follow_up_question: Still not working after I retried.
+    expected_follow_up_status: ticket_created
+    notes: Configuration follow-up without added context should escalate to ticket creation.
+
+  - case_id: kb_answer_chunk_settings
+    category: knowledge-base
+    type: single_turn
+    question: How do I configure chunk settings for a knowledge base in Dify?
+    expected_status: answered
+    required_source_urls:
+      - https://docs.dify.ai/en/guides/knowledge-base/create-knowledge-and-upload-documents/chunking-and-cleaning-text
+    notes: Knowledge-base answer should cite the chunk settings documentation.
+
+  - case_id: kb_answer_retrieval_test
+    category: knowledge-base
+    type: single_turn
+    question: How do I test retrieval and citations for a knowledge base in Dify?
+    expected_status: answered
+    required_source_urls:
+      - https://docs.dify.ai/en/guides/knowledge-base/retrieval-test-and-citation
+    notes: Knowledge-base answer should cite the retrieval test and citation page.
+
+  - case_id: kb_clarify_vague_search_issue
+    category: knowledge-base
+    type: single_turn
+    question: My uploaded documents are not searchable.
+    expected_status: needs_clarification
+    expected_missing_slots:
+      - deployment_method
+      - version
+      - error_message
+      - environment
+    notes: Vague retrieval complaints should clarify instead of answering from generic KB pages.
+
+  - case_id: kb_ticket_after_follow_up
+    category: knowledge-base
+    type: two_turn
+    initial_question: My knowledge base search is bad.
+    expected_initial_status: needs_clarification
+    expected_missing_slots:
+      - deployment_method
+      - version
+      - error_message
+      - environment
+    follow_up_question: Still bad after rebuilding the knowledge base.
+    expected_follow_up_status: ticket_created
+    notes: A vague KB complaint should clarify first, then escalate if the follow-up is still insufficient.
+
+  - case_id: int_answer_api_backend
+    category: integration
+    type: single_turn
+    question: How do I develop with Dify APIs from a backend service?
+    expected_status: answered
+    required_source_urls:
+      - https://docs.dify.ai/en/use-dify/publish/developing-with-apis
+    notes: Integration answer should cite the backend API guide.
+
+  - case_id: int_answer_tool_oauth
+    category: integration
+    type: single_turn
+    question: How do I add OAuth support to a tool plugin in Dify?
+    expected_status: answered
+    required_source_urls:
+      - https://docs.dify.ai/en/develop-plugin/dev-guides-and-walkthroughs/tool-oauth
+    notes: Integration answer should cite the tool OAuth support guide.
+
+  - case_id: int_clarify_vague_api_issue
+    category: integration
+    type: single_turn
+    question: My API integration is broken.
+    expected_status: needs_clarification
+    expected_missing_slots:
+      - deployment_method
+      - version
+      - error_message
+      - environment
+    notes: Vague integration complaints should clarify before answering.
+
+  - case_id: int_ticket_after_follow_up
+    category: integration
+    type: two_turn
+    initial_question: My plugin integration fails.
+    expected_initial_status: needs_clarification
+    expected_missing_slots:
+      - deployment_method
+      - version
+      - environment
+    follow_up_question: Still failing after I retried the integration.
+    expected_follow_up_status: ticket_created
+    notes: Integration follow-up without concrete details should escalate after one clarification.
+
+  - case_id: direct_unclassified_ticket
+    category: unclassified
+    type: single_turn
+    question: Help me compare Dify pricing strategies for investors.
+    expected_status: ticket_created
+    notes: Out-of-scope product strategy questions should go directly to ticket_created via unclassified.

@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     support_citation_top_k: int = 2
     min_evidence_hits: int = 2
     min_score: float = 0.35
-    min_score_note: str = "pending calibration"
+    min_score_note: str = "retained after replay sweep on support_eval_v1; no safer improvement observed in 0.20-0.45"
     vector_store_backend: str = "lightweight-local-vector-store"
 
     model_config = SettingsConfigDict(env_prefix="COPILOT_", case_sensitive=False)
