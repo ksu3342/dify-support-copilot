@@ -1,338 +1,263 @@
 # Dify Internal Support Copilot
 
-An internal support copilot for self-hosted Dify deployment and maintenance questions.
+Deterministic support triage MVP for self-hosted Dify operations: classify a support question, retrieve grounded evidence from official Dify docs, either answer conservatively, ask one clarification, or create a ticket.
 
-## What This Repo Is
+## Why This Project Exists
 
-- A single-purpose internal support triage assistant for self-hosted Dify.
-- A single-corpus system constrained to authoritative Dify documentation.
-- A minimal FastAPI service with a synchronous SQLite-backed support decision chain and local retrieval.
+Most Dify support demos stop at "chat over docs". That misses the real internal support workflow:
 
-## What This Repo Is Not
+- questions are not always answerable on first turn
+- vague problem reports should not be answered too confidently
+- support needs escalation paths, retrieval logs, and replayable evaluation
+- self-hosted support depends on a bounded, authoritative corpus rather than open-ended web search
 
-- Not a general agent platform.
-- Not a dashboard product.
-- Not a generic RAG demo.
-- Not a multi-agent, multi-model, or multi-vector-store system.
+This repo focuses on that narrower but more defensible slice:
 
-## V1 Target Scope
+- single product corpus: Dify official English docs
+- single support chain: classify -> retrieve -> answer / clarify / ticket
+- deterministic baseline instead of remote LLM dependency
+- replay eval to measure behavior changes before changing rules
 
-- Single corpus domain: `Dify`
-- Business categories:
+## Current Capabilities
+
+The current implementation supports:
+
+- `GET /healthz`
+- `POST /v1/support/ask`
+- `GET /v1/runs/{run_id}`
+- `GET /v1/tickets/{ticket_id}`
+- deterministic classification into:
   - `deployment`
   - `configuration`
   - `knowledge-base`
   - `integration`
-- Fallback state: `unclassified`
-- Single main chain:
-  1. User asks a question
-  2. Classify
-  3. Retrieve from official Dify docs
-  4. Answer with citations
-  5. Ask one clarification question if information is missing
-  6. If still insufficient, run the single real action: `create_ticket`
-  7. Record logs
-
-## V1 Target Model Boundaries
-
-This is the intended V1 product boundary, not a claim that the current code already uses remote LLMs.
-
-- `classification`: target is structured model output restricted to `deployment`, `configuration`, `knowledge-base`, `integration`, `unclassified`
-- `slot extraction`: target is rules first with optional model assist, fixed schema only:
+  - `unclassified`
+- fixed slot extraction for:
   - `deployment_method`
   - `version`
   - `error_message`
   - `environment`
-- `retrieval`: retrieval only, no model in retrieval decision
-- `answer generation`: target is evidence-grounded answer generation with citations
-- `clarification question`: target is one natural-language clarification question when required
-- `ticket creation`: structured action only, persisted to SQLite
+- manifest-guided retrieval over locally indexed Dify documentation
+- three synchronous support outcomes:
+  - `answered`
+  - `needs_clarification`
+  - `ticket_created`
+- one-turn clarification limit via `follow_up_run_id`
+- retrieval hit logging and SQLite ticket persistence
+- replay eval cases with threshold verification for the current baseline
 
-## Current Day 4 Runtime
+## What This Is Not
 
-The current checked-in implementation is a deterministic baseline, not a remote-model system.
+This repository is intentionally not:
 
-- `classification`: deterministic keyword and weighting rules
-- `slot extraction`: deterministic fixed-schema extraction
-- `retrieval`: local retrieval using the current indexed Dify corpus
-- `answer generation`: retrieval-backed extractive assembly from evidence snippets
-- `clarification question`: rule-generated clarification text
-- `ticket creation`: structured SQLite write
-- `snapshot_version`: still a manifest or batch label, not an immutable content snapshot identifier
+- a remote-LLM support system
+- a generic agent framework
+- a multi-agent orchestration demo
+- a production-grade support platform
+- a dashboard or frontend product
+- a multi-source knowledge platform
+- a vector database benchmark
 
-## Current Day 1 Delivery
+Current answer generation is retrieval-backed extractive assembly. Current classification is deterministic. Clarification text is rule-generated. No external model provider is called.
 
-Implemented in this round:
+## Architecture Overview
 
-- Independent git repository at `D:\AI agent\dify-support-copilot`
-- Frozen spec in `SPEC.md`
-- FastAPI scaffold with:
-  - `GET /healthz`
-  - `POST /v1/support/ask`
-  - `GET /v1/runs/{run_id}`
-  - `GET /v1/tickets/{ticket_id}`
-- SQLite schema for:
-  - `support_runs`
-  - `retrieval_hits`
-  - `tickets`
-  - `document_snapshots`
-- Source manifest at `data/sources.yaml`
-- Minimal pytest coverage for `/healthz`
-
-Not implemented in this round:
-
-- Real crawling or document snapshot ingestion
-- Real chunking, indexing, or retrieval
-- Real LLM integration
-- Real clarification logic
-- Real ticket decision logic
-- Full end-to-end support chain
-
-## Day 2 Delivery
-
-Implemented in this round:
-
-- Real source manifest loading from `data/sources.yaml`
-- Real HTTP fetching for official `docs.dify.ai` pages listed in the manifest
-- Raw HTML snapshots written under `data/raw/<snapshot_version>/...`
-- Cleaned text written under `data/clean/<snapshot_version>/...`
-- Idempotent snapshot metadata upsert into SQLite `document_snapshots`
-- Minimal offline tests for:
-  - source manifest loading
-  - stable snapshot id and path generation
-  - HTML cleaning
-
-Still not implemented in this round:
-
-- retrieval
-- chunking
-- embeddings
-- vector search
-- LLM integration
-- citation generation
-- clarification logic
-- ticket business logic
-
-## Day 3 Delivery
-
-Implemented in this round:
-
-- Deterministic chunking over cleaned text
-- Minimal local retrieval index using SQLite FTS5
-- Chunk metadata persisted in SQLite `document_chunks`
-- CLI commands for index build and search:
-  - `.\.venv\Scripts\python scripts\build_index.py`
-  - `.\.venv\Scripts\python scripts\search_chunks.py --query "docker compose self hosted install" --top-k 5`
-
-Still not implemented in this round:
-
-- LLM-based classification
-- citation answer generation
-- clarification logic
-- ticket business logic
-- external embeddings or vector database integration
-
-## Day 4 Delivery
-
-Implemented in this round:
-
-- `POST /v1/support/ask` now runs a real synchronous support chain and returns `200`
-- Deterministic baseline classification
-- Fixed-schema slot extraction for:
-  - `deployment_method`
-  - `version`
-  - `error_message`
-  - `environment`
-- Manifest-guided retrieval using category filtering and light tag-based score boost
-- Deterministic retrieval-backed extractive answers with citations
-- Clarification flow with one-step continuation via `follow_up_run_id`
-- Real ticket creation in SQLite when the request is unclassified or still insufficient after clarification
-- Retrieval hit logging into `retrieval_hits`
-- Clarification text is rule-generated, not remote-model generated
-- Answer assembly is retrieval-backed and extractive, not remote-model generated
-
-Still not implemented in this round:
-
-- remote LLM classification
-- remote LLM answer generation
-- rerank
-- embeddings
-- async worker or queue
-
-Current limitation:
-
-- `snapshot_version` is still a manifest or batch label. It is not yet a content-immutable snapshot version.
-
-## Day 5 Delivery
-
-Implemented in this round:
-
-- Expanded `data/sources.yaml` from 15 to 24 official `docs.dify.ai` English pages
-- Added higher-support-value corpus coverage for:
-  - self-host troubleshooting
-  - Docker issues
-  - storage and migration
-  - Weaviate migration
-  - plugin OAuth and trigger integration support
-- `document_snapshots` now records both:
-  - `requested_url`
-  - `final_url`
-- `source_url` is retained as a compatibility alias of `requested_url` for the current retrieval pipeline
-- Repeated fetches for the same `snapshot_version + requested_url` are now:
-  - idempotent when `content_hash` is unchanged
-  - explicitly rejected when `content_hash` changes
-- Existing SQLite databases are upgraded in place by the repo's minimal schema migration path during `init_db()`
-
-Still not implemented in this round:
-
-- a full immutable historical snapshot versioning system
-- historical diff tracking across snapshot versions
-- any remote-model or embedding-based data pipeline
-
-## Day 6 Delivery
-
-Implemented in this round:
-
-- Added tracked replay eval cases at `data/evals/support_eval_v1.yaml`
-- Added a replay eval runner at `scripts/run_eval.py`
-- Replay eval runs against the current local Dify corpus after a preflight check for:
-  - current `snapshot_version`
-  - `document_snapshots`
-  - `document_chunks`
-- Replay eval reports:
-  - status accuracy
-  - category accuracy
-  - answered citation hit rate
-  - clarification slot match rate
-  - ticket path pass rate
-- Current `min_score` remains `0.35`
-- Day 6 replay sweep over `0.20` to `0.45` did not improve the false-answered cases, so the default threshold was retained
-
-Current limitation:
-
-- Day 6 adds a local replay-eval baseline, not an online evaluation system and not a model upgrade
-
-## Day 7 Delivery
-
-Implemented in this round:
-
-- Hardened the deterministic support decision rules for `knowledge-base` and `integration`
-- Vague problem-report queries in those categories now clarify first instead of answering optimistically
-- If the follow-up still does not add enough diagnostic detail, the request escalates to `ticket_created`
-
-Current rule boundary:
-
-- how-to / guide-style questions still remain eligible for `answered`
-- vague complaint-style questions now prefer `needs_clarification`
-
-Run the Day 2 fetch command with:
-
-```powershell
-cd D:\AI agent\dify-support-copilot
-.\.venv\Scripts\python scripts\fetch_sources.py
+```mermaid
+flowchart TD
+    A["User question"] --> B["Deterministic classification"]
+    B --> C["Fixed-slot extraction"]
+    C --> D["Manifest-guided retrieval"]
+    D --> E{"Decision rules"}
+    E -->|enough evidence| F["answered + citations"]
+    E -->|needs one more turn| G["needs_clarification"]
+    E -->|still insufficient / unclassified| H["ticket_created"]
+    D --> I["retrieval_hits in SQLite"]
+    F --> J["support_runs in SQLite"]
+    G --> J
+    H --> K["tickets in SQLite"]
+    H --> J
 ```
 
-## Storage and Retrieval Notes
+Key data flow:
 
-- SQLite is used for tickets, logs, and metadata.
-- Retrieval is specified only as a `lightweight local vector store`.
-- No specific vector store is treated as a product-level commitment in the spec.
-- Day 3 local retrieval uses SQLite FTS5 as a minimal, repo-local indexing step. This is a bootstrap retrieval mechanism, not a claim that full RAG is complete.
+- source manifest lives in [`data/sources.yaml`](/D:/AI%20agent/dify-support-copilot/data/sources.yaml)
+- raw and cleaned documentation snapshots are fetched locally
+- cleaned text is chunked and indexed into SQLite FTS5
+- `/v1/support/ask` reuses that local retrieval layer
+- replay eval replays version-controlled support cases against the same chain
 
-## Threshold Notes
+More detail:
 
-- `MIN_EVIDENCE_HITS = 2` is reserved in the spec.
-- `MIN_SCORE` is configurable.
-- Day 6 replay sweep over `0.20`, `0.25`, `0.30`, `0.35`, `0.40`, and `0.45` did not change the replay failures, so the default remains `0.35`.
-- The remaining false-answered cases come from retrieval and deterministic decision behavior that this sweep did not move.
+- architecture notes: [docs/ARCHITECTURE.md](/D:/AI%20agent/dify-support-copilot/docs/ARCHITECTURE.md)
+- demo script: [docs/DEMO_SCRIPT.md](/D:/AI%20agent/dify-support-copilot/docs/DEMO_SCRIPT.md)
+- interview notes: [docs/INTERVIEW_NOTES.md](/D:/AI%20agent/dify-support-copilot/docs/INTERVIEW_NOTES.md)
+- resume bullets: [docs/RESUME_BULLETS.md](/D:/AI%20agent/dify-support-copilot/docs/RESUME_BULLETS.md)
 
-## Document Snapshot Versioning
+## Tech Stack
 
-Every document snapshot record is expected to keep:
+- Python
+- FastAPI
+- Pydantic
+- SQLite
+- SQLite FTS5 for local lexical retrieval
+- pytest
+- PowerShell-friendly CLI scripts
+- Docker / Docker Compose for local packaging
 
-- `requested_url`
-- `final_url`
-- `source_url`
-- `fetched_at`
-- `content_hash`
-- `snapshot_version`
+The public-facing wording stays intentionally generic: retrieval is a `lightweight local vector store` step in product framing, while the current Day 3/4 implementation uses SQLite FTS5 as the simplest local retrieval backend.
 
-For Day 1, `snapshot_version` is sourced from `data/sources.yaml` and treated as a stable manifest version identifier. The actual fetch pipeline is out of scope for this round.
+## Corpus Boundary
 
-For Day 2, the same `snapshot_version` is used to place raw and cleaned files on disk and to key SQLite snapshot metadata updates.
+Authority boundary:
 
-For Day 5, `snapshot_version` is still a manifest or batch label rather than a full immutable history identifier. The hardening added in Day 5 is narrower and more conservative:
+- single corpus domain: Dify
+- official English docs only
+- primary authority: `docs.dify.ai`
+- no forum/blog/issues backfilled into the knowledge base
 
-- `requested_url` and `final_url` are stored separately
-- repeated fetches with the same content are allowed
-- repeated fetches with changed content under the same `snapshot_version + requested_url` are rejected instead of silently overwriting
+Snapshot boundary:
+
+- `snapshot_version` is currently a manifest/batch label, not a full immutable history system
+- Day 5 hardening prevents silent content drift inside the same `snapshot_version`
+- `requested_url` and `final_url` are stored separately to avoid redirect ambiguity
 
 ## Local Run
 
-```powershell
-cd D:\AI agent\dify-support-copilot
-python -m venv .venv
-.venv\Scripts\python -m pip install -r requirements.txt
-.venv\Scripts\python -m uvicorn app.api.main:app --host 127.0.0.1 --port 8000
-```
-
-Then open:
-
-- `http://127.0.0.1:8000/healthz`
-- `http://127.0.0.1:8000/docs`
-
-Example support request:
-
-```powershell
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/v1/support/ask -ContentType 'application/json' -Body '{"question":"How do I configure chunk settings for a knowledge base in Dify?"}'
-```
-
-## Test
+### 1. Install dependencies
 
 ```powershell
 cd D:\AI agent\dify-support-copilot
-.venv\Scripts\python -m pytest
+.\.venv\Scripts\python -m pip install -r requirements.txt
 ```
 
-Replay eval:
+### 2. Fetch docs and build the local index
 
 ```powershell
-cd D:\AI agent\dify-support-copilot
+.\.venv\Scripts\python scripts\fetch_sources.py
+.\.venv\Scripts\python scripts\build_index.py
+```
+
+### 3. Start the API
+
+```powershell
+.\.venv\Scripts\python -m uvicorn app.api.main:app --host 127.0.0.1 --port 8000
+```
+
+## Minimal Demo Flow
+
+### Health check
+
+```powershell
+Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8000/healthz'
+```
+
+Expected shape:
+
+```json
+{
+  "status": "ok",
+  "service": "dify-support-copilot",
+  "app_env": "dev",
+  "sqlite_ready": true
+}
+```
+
+### Answered example
+
+```powershell
+$answered = Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8000/v1/support/ask' -ContentType 'application/json' -Body '{
+  "question": "How do I configure chunk settings for a knowledge base in Dify?"
+}'
+$answered | ConvertTo-Json -Depth 6
+```
+
+Expected behavior:
+
+- `run.status = "answered"`
+- `answer` is non-empty
+- `citations` is non-empty
+
+### Clarification example
+
+```powershell
+$clarify = Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8000/v1/support/ask' -ContentType 'application/json' -Body '{
+  "question": "My plugin integration fails."
+}'
+$clarify | ConvertTo-Json -Depth 6
+```
+
+Expected behavior:
+
+- `run.status = "needs_clarification"`
+- `clarification.question` is non-empty
+- `clarification.missing_slots` is non-empty
+
+### Follow-up to ticket example
+
+```powershell
+$followUpBody = @{
+  question = "Still failing after I retried the integration."
+  follow_up_run_id = $clarify.run.run_id
+} | ConvertTo-Json
+
+$ticket = Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8000/v1/support/ask' -ContentType 'application/json' -Body $followUpBody
+$ticket | ConvertTo-Json -Depth 6
+```
+
+Expected behavior:
+
+- `run.status = "ticket_created"`
+- `ticket.ticket_id` is present
+
+Full step-by-step version:
+
+- [docs/DEMO_SCRIPT.md](/D:/AI%20agent/dify-support-copilot/docs/DEMO_SCRIPT.md)
+
+## Replay Eval Summary
+
+Current local replay baseline uses version-controlled support cases in [`data/evals/support_eval_v1.yaml`](/D:/AI%20agent/dify-support-copilot/data/evals/support_eval_v1.yaml).
+
+Coverage:
+
+- 4 categories: deployment / configuration / knowledge-base / integration
+- 3 outcomes: answered / needs_clarification / ticket_created
+- includes two-turn escalation cases
+
+Current baseline summary:
+
+- `status_accuracy = 1.00`
+- `category_accuracy = 1.00`
+- `answered_citation_hit_rate = 1.00`
+- `clarification_slot_match_rate = 1.00`
+- `ticket_path_pass_rate = 1.00`
+
+Run locally:
+
+```powershell
 .\.venv\Scripts\python scripts\run_eval.py
-.\.venv\Scripts\python scripts\run_eval.py --min-score 0.45
 ```
 
-Replay eval artifacts are written under `storage/evals/`.
+This is a local replay eval baseline, not an online experimentation platform.
 
-Integration tests are self-contained:
+## Known Limitations
 
-- they initialize a temporary SQLite database
-- they seed tracked fixtures from `tests/fixtures/`
-- they do not depend on `storage/copilot.db`
-- they do not depend on existing `data/raw/` or `data/clean/` contents
+- no remote LLM provider is integrated
+- answer style is conservative and extractive, not conversational synthesis
+- only one product corpus is supported
+- retrieval is lexical local retrieval, not embedding-based semantic search
+- clarification logic is rule-based and intentionally narrow
+- one clarification turn only
+- `snapshot_version` is not a full immutable version-management system
+- no frontend, queue, auth layer, or dashboard
 
-## Docker
+## Repository Map
 
-```powershell
-cd D:\AI agent\dify-support-copilot
-docker compose up --build
-```
+- API entry: [app/api/main.py](/D:/AI%20agent/dify-support-copilot/app/api/main.py)
+- support decision chain: [app/support/service.py](/D:/AI%20agent/dify-support-copilot/app/support/service.py)
+- retrieval index/search: [app/retrieval/index.py](/D:/AI%20agent/dify-support-copilot/app/retrieval/index.py)
+- eval runner: [scripts/run_eval.py](/D:/AI%20agent/dify-support-copilot/scripts/run_eval.py)
+- architecture notes: [docs/ARCHITECTURE.md](/D:/AI%20agent/dify-support-copilot/docs/ARCHITECTURE.md)
 
-Docker persistence now mounts both:
+## Development Notes
 
-- `./storage:/app/storage`
-- `./data:/app/data`
-
-## Repo Layout
-
-```text
-app/
-  api/
-    main.py
-    routes/
-  core/
-  models/
-data/
-scripts/
-tests/
-```
+This repository was built incrementally across Day 1-7 milestones, but the README no longer mirrors that day-by-day build log. Historical staging can be inferred from commit history; the current docs focus on the project as it exists now.
