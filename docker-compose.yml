@@ -1,0 +1,11 @@
+services:
+  api:
+    build:
+      context: .
+    ports:
+      - "8000:8000"
+    environment:
+      COPILOT_APP_ENV: docker
+      COPILOT_SQLITE_PATH: /app/storage/copilot.db
+    volumes:
+      - ./storage:/app/storage

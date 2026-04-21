@@ -1,0 +1,92 @@
+product: Dify
+authoritative_language: en
+snapshot_version: dify-docs-en-2026-04-21-v1
+pages:
+  - url: https://docs.dify.ai/getting-started/install-self-hosted/docker-compose
+    category: deployment
+    tags:
+      - self-hosted
+      - docker-compose
+      - install
+  - url: https://docs.dify.ai/getting-started/install-self-hosted/environments
+    category: deployment
+    tags:
+      - self-hosted
+      - env
+      - install
+  - url: https://docs.dify.ai/en/self-host/quick-start/faqs
+    category: deployment
+    tags:
+      - self-hosted
+      - faq
+      - troubleshooting
+  - url: https://docs.dify.ai/en/guides/model-configuration/schema
+    category: configuration
+    tags:
+      - model
+      - schema
+      - configuration
+  - url: https://docs.dify.ai/en/use-dify/workspace/plugins
+    category: integration
+    tags:
+      - plugins
+      - workspace
+      - extension
+  - url: https://docs.dify.ai/en/guides/knowledge-base/readme
+    category: knowledge-base
+    tags:
+      - knowledge-base
+      - overview
+  - url: https://docs.dify.ai/en/guides/knowledge-base/create-knowledge-and-upload-documents/chunking-and-cleaning-text
+    category: knowledge-base
+    tags:
+      - knowledge-base
+      - chunking
+      - cleaning
+  - url: https://docs.dify.ai/en/use-dify/knowledge/create-knowledge/setting-indexing-methods
+    category: knowledge-base
+    tags:
+      - knowledge-base
+      - indexing
+  - url: https://docs.dify.ai/en/guides/workflow/node/knowledge-retrieval
+    category: knowledge-base
+    tags:
+      - workflow
+      - retrieval
+      - node
+  - url: https://docs.dify.ai/en/guides/knowledge-base/retrieval-test-and-citation
+    category: knowledge-base
+    tags:
+      - retrieval
+      - citation
+      - evaluation
+  - url: https://docs.dify.ai/en/use-dify/publish/developing-with-apis
+    category: integration
+    tags:
+      - api
+      - publish
+      - integration
+  - url: https://docs.dify.ai/en/guides/workflow/node/http-request
+    category: integration
+    tags:
+      - workflow
+      - http-request
+      - integration
+  - url: https://docs.dify.ai/en/guides/workflow/node/tools
+    category: integration
+    tags:
+      - workflow
+      - tools
+      - integration
+  - url: https://docs.dify.ai/en/guides/workflow/node/question-classifier
+    category: configuration
+    tags:
+      - workflow
+      - classifier
+      - configuration
+  - url: https://docs.dify.ai/en/use-dify/nodes/ifelse
+    category: configuration
+    tags:
+      - workflow
+      - if-else
+      - logic
