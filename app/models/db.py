@@ -1,11 +1,24 @@
 import json
 import sqlite3
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from app.models.api import Category, RunRecord, RunStatus, SnapshotRecord, TicketRecord, TicketStatus
+
+
+@dataclass(frozen=True)
+class StoredSupportRun:
+    run_id: str
+    question: str
+    request_payload: Dict[str, Any]
+    status: RunStatus
+    category: Category
+    confidence: float
+    created_at: datetime
+    updated_at: datetime
 
 
 def _utc_now() -> datetime:
@@ -93,6 +106,31 @@ def get_support_run(run_id: str, sqlite_path: Optional[str] = None) -> Optional[
     )
 
 
+def get_support_run_state(run_id: str, sqlite_path: Optional[str] = None) -> Optional[StoredSupportRun]:
+    target_db = sqlite_path or _default_sqlite_path()
+    with _connect(target_db) as connection:
+        row = connection.execute(
+            """
+            SELECT run_id, question, request_payload, status, category, confidence, created_at, updated_at
+            FROM support_runs
+            WHERE run_id = ?
+            """,
+            (run_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    return StoredSupportRun(
+        run_id=row["run_id"],
+        question=row["question"],
+        request_payload=json.loads(row["request_payload"]),
+        status=RunStatus(row["status"]),
+        category=Category(row["category"]),
+        confidence=float(row["confidence"]),
+        created_at=datetime.fromisoformat(row["created_at"]),
+        updated_at=datetime.fromisoformat(row["updated_at"]),
+    )
+
+
 def get_ticket(ticket_id: str, sqlite_path: Optional[str] = None) -> Optional[TicketRecord]:
     target_db = sqlite_path or _default_sqlite_path()
     with _connect(target_db) as connection:
@@ -114,6 +152,72 @@ def get_ticket(ticket_id: str, sqlite_path: Optional[str] = None) -> Optional[Ti
         created_at=datetime.fromisoformat(row["created_at"]),
         updated_at=datetime.fromisoformat(row["updated_at"]),
     )
+
+
+def insert_ticket(
+    run_id: str,
+    summary: str,
+    sqlite_path: Optional[str] = None,
+) -> TicketRecord:
+    target_db = sqlite_path or _default_sqlite_path()
+    now = _utc_now().isoformat()
+    ticket_id = str(uuid4())
+    with _connect(target_db) as connection:
+        connection.execute(
+            """
+            INSERT INTO tickets (
+                ticket_id,
+                run_id,
+                status,
+                summary,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (ticket_id, run_id, TicketStatus.OPEN.value, summary, now, now),
+        )
+        connection.commit()
+    return get_ticket(ticket_id, sqlite_path=target_db)  # type: ignore[return-value]
+
+
+def insert_retrieval_hits(
+    run_id: str,
+    hits: List[Dict[str, Any]],
+    sqlite_path: Optional[str] = None,
+) -> None:
+    if not hits:
+        return
+    target_db = sqlite_path or _default_sqlite_path()
+    now = _utc_now().isoformat()
+    with _connect(target_db) as connection:
+        connection.executemany(
+            """
+            INSERT INTO retrieval_hits (
+                run_id,
+                source_url,
+                title,
+                snippet,
+                score,
+                snapshot_version,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    run_id,
+                    hit["source_url"],
+                    hit.get("title"),
+                    hit["snippet"],
+                    hit.get("score"),
+                    hit["snapshot_version"],
+                    now,
+                )
+                for hit in hits
+            ],
+        )
+        connection.commit()
 
 
 def upsert_document_snapshot(
@@ -249,6 +353,25 @@ def count_document_chunks(snapshot_version: Optional[str] = None, sqlite_path: O
         parameters = (snapshot_version,)
     with _connect(target_db) as connection:
         row = connection.execute(query, parameters).fetchone()
+    return int(row["total"]) if row is not None else 0
+
+
+def count_retrieval_hits(run_id: Optional[str] = None, sqlite_path: Optional[str] = None) -> int:
+    target_db = sqlite_path or _default_sqlite_path()
+    query = "SELECT COUNT(*) AS total FROM retrieval_hits"
+    parameters: tuple[str, ...] = ()
+    if run_id is not None:
+        query += " WHERE run_id = ?"
+        parameters = (run_id,)
+    with _connect(target_db) as connection:
+        row = connection.execute(query, parameters).fetchone()
+    return int(row["total"]) if row is not None else 0
+
+
+def count_tickets(sqlite_path: Optional[str] = None) -> int:
+    target_db = sqlite_path or _default_sqlite_path()
+    with _connect(target_db) as connection:
+        row = connection.execute("SELECT COUNT(*) AS total FROM tickets").fetchone()
     return int(row["total"]) if row is not None else 0
 
 

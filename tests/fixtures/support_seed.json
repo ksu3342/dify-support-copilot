@@ -1,0 +1,92 @@
+{
+  "snapshot_version": "test-support-v1",
+  "fetched_at": "2026-04-21T00:00:00+00:00",
+  "created_at": "2026-04-21T00:00:00+00:00",
+  "documents": [
+    {
+      "snapshot_id": "snap_test_deploy_docker",
+      "source_url": "https://docs.dify.ai/getting-started/install-self-hosted/docker-compose",
+      "title": "Deploy Dify with Docker Compose - Dify Docs",
+      "stored_path": "data/raw/test-support-v1/getting-started/install-self-hosted/docker-compose.html",
+      "chunk_records": [
+        {
+          "chunk_id": "chunk_test_deploy_docker_0",
+          "chunk_index": 0,
+          "content": "Deploy Dify with Docker Compose\nInstall Dify with Docker Compose for a self-hosted deployment. Run docker compose up -d after you configure the required environment variables."
+        },
+        {
+          "chunk_id": "chunk_test_deploy_docker_1",
+          "chunk_index": 1,
+          "content": "Docker Compose troubleshooting\nIf a docker compose deployment fails during install, check the container logs, review the compose file, and confirm your server environment."
+        }
+      ]
+    },
+    {
+      "snapshot_id": "snap_test_deploy_env",
+      "source_url": "https://docs.dify.ai/getting-started/install-self-hosted/environments",
+      "title": "Environment Variables - Dify Docs",
+      "stored_path": "data/raw/test-support-v1/getting-started/install-self-hosted/environments.html",
+      "chunk_records": [
+        {
+          "chunk_id": "chunk_test_deploy_env_0",
+          "chunk_index": 0,
+          "content": "Environment Variables\nReference for self-hosted deployments. Set environment variables such as CONSOLE_API_URL and other backend configuration values before startup."
+        }
+      ]
+    },
+    {
+      "snapshot_id": "snap_test_chunk_settings",
+      "source_url": "https://docs.dify.ai/en/guides/knowledge-base/create-knowledge-and-upload-documents/chunking-and-cleaning-text",
+      "title": "Configure the Chunk Settings - Dify Docs",
+      "stored_path": "data/raw/test-support-v1/en/guides/knowledge-base/create-knowledge-and-upload-documents/chunking-and-cleaning-text.html",
+      "chunk_records": [
+        {
+          "chunk_id": "chunk_test_chunk_settings_0",
+          "chunk_index": 0,
+          "content": "Configure the Chunk Settings\nAdjust delimiters, maximum chunk length, and chunk overlap to split a knowledge base into stable chunks."
+        },
+        {
+          "chunk_id": "chunk_test_chunk_settings_1",
+          "chunk_index": 1,
+          "content": "Chunk settings guidance\nThe chunk mode cannot be changed once the knowledge base is created. You can still tune chunk settings to improve retrieval quality."
+        }
+      ]
+    },
+    {
+      "snapshot_id": "snap_test_indexing",
+      "source_url": "https://docs.dify.ai/en/use-dify/knowledge/create-knowledge/setting-indexing-methods",
+      "title": "Specify the Index Method and Retrieval Settings - Dify Docs",
+      "stored_path": "data/raw/test-support-v1/en/use-dify/knowledge/create-knowledge/setting-indexing-methods.html",
+      "chunk_records": [
+        {
+          "chunk_id": "chunk_test_indexing_0",
+          "chunk_index": 0,
+          "content": "Specify the Index Method and Retrieval Settings\nChoose indexing and retrieval settings for a knowledge base. Higher quality indexing can improve how chunks are matched."
+        },
+        {
+          "chunk_id": "chunk_test_indexing_1",
+          "chunk_index": 1,
+          "content": "Knowledge base retrieval\nUse retrieval settings to balance accuracy and speed when searching knowledge base chunks."
+        }
+      ]
+    },
+    {
+      "snapshot_id": "snap_test_api",
+      "source_url": "https://docs.dify.ai/en/use-dify/publish/developing-with-apis",
+      "title": "API - Dify Docs",
+      "stored_path": "data/raw/test-support-v1/en/use-dify/publish/developing-with-apis.html",
+      "chunk_records": [
+        {
+          "chunk_id": "chunk_test_api_0",
+          "chunk_index": 0,
+          "content": "API\nIntegrate your Dify workflows anywhere. Use the API from your backend service and create API credentials from API Access."
+        },
+        {
+          "chunk_id": "chunk_test_api_1",
+          "chunk_index": 1,
+          "content": "API credentials\nGenerate API credentials and call Dify from your backend application instead of exposing keys in frontend code."
+        }
+      ]
+    }
+  ]
+}

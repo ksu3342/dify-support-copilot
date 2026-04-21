@@ -42,13 +42,16 @@ class SupportSlots(BaseModel):
 class SupportAskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
     user_id: Optional[str] = Field(default=None, max_length=255)
+    follow_up_run_id: Optional[str] = Field(default=None, max_length=255)
     context_slots: SupportSlots = Field(default_factory=SupportSlots)
 
 
 class Citation(BaseModel):
+    chunk_id: Optional[str] = None
     source_url: str
     snapshot_version: str
     title: Optional[str] = None
+    chunk_index: Optional[int] = None
     snippet: str
 
 

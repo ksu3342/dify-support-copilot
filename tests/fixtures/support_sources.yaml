@@ -1,0 +1,34 @@
+product: Dify
+authoritative_language: en
+snapshot_version: test-support-v1
+pages:
+  - url: https://docs.dify.ai/getting-started/install-self-hosted/docker-compose
+    category: deployment
+    tags:
+      - self-hosted
+      - docker-compose
+      - install
+  - url: https://docs.dify.ai/getting-started/install-self-hosted/environments
+    category: deployment
+    tags:
+      - self-hosted
+      - env
+      - install
+  - url: https://docs.dify.ai/en/guides/knowledge-base/create-knowledge-and-upload-documents/chunking-and-cleaning-text
+    category: knowledge-base
+    tags:
+      - knowledge-base
+      - chunking
+      - cleaning
+  - url: https://docs.dify.ai/en/use-dify/knowledge/create-knowledge/setting-indexing-methods
+    category: knowledge-base
+    tags:
+      - knowledge-base
+      - indexing
+      - retrieval
+  - url: https://docs.dify.ai/en/use-dify/publish/developing-with-apis
+    category: integration
+    tags:
+      - api
+      - publish
+      - integration

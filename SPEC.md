@@ -73,6 +73,26 @@ This round still does not add:
 - external embedding services
 - multi-vector-store support
 
+## 2.3 Day 4 Scope
+
+This round adds only the minimum synchronous support decision chain:
+
+- deterministic classification
+- fixed-schema slot extraction
+- manifest-guided retrieval
+- deterministic extractive answer generation
+- clarification on first insufficient pass
+- ticket creation on unclassified or still-insufficient follow-up
+- retrieval hit logging
+
+This round still does not add:
+
+- remote LLM calls
+- embeddings
+- rerank
+- async worker or queue
+- new frontend or dashboard work
+
 ## 3. Frozen V1 Main Chain
 
 1. User asks a question
@@ -111,11 +131,13 @@ Fallback status:
 - No self-authored FAQ injected into the knowledge base
 - GitHub issue phrasing may be used for future evaluation prompts, but issue content must not be ingested back into the knowledge base
 
-## 6. LLM Boundaries
+## 6. V1 Target Model Boundaries
+
+The following subsections describe the intended V1 product boundary. They are not a claim that the current Day 4 implementation already calls remote models.
 
 ### 6.1 Classification
 
-- Uses LLM with structured output
+- Target state uses structured model output
 - Allowed output only:
   - `deployment`
   - `configuration`
@@ -126,7 +148,7 @@ Fallback status:
 ### 6.2 Slot Extraction
 
 - Rules first
-- LLM assistance is optional
+- Model assistance is optional
 - Final output must conform to a fixed schema
 - Allowed slots only:
   - `deployment_method`
@@ -137,17 +159,17 @@ Fallback status:
 ### 6.3 Retrieval
 
 - Pure retrieval step
-- No LLM participates in retrieval decisions
+- No model participates in retrieval decisions
 - Retrieval backend is described only as a `lightweight local vector store`
 
 ### 6.4 Answer Generation
 
-- LLM may answer only from retrieved evidence
-- Citations are mandatory in the final answer when evidence is returned
+- Target state may use model-generated answers only from retrieved evidence
+- Citations are mandatory when evidence is returned
 
 ### 6.5 Clarification Question
 
-- LLM may turn missing fields into natural language
+- Target state may turn missing fields into natural language
 - Only one clarification question is allowed
 
 ### 6.6 Ticket Creation
@@ -155,6 +177,15 @@ Fallback status:
 - Structured action only
 - No free-form long-form generation requirement
 - Must persist a structured record into SQLite
+
+### 6.7 Current Day 4 Implementation
+
+- `classification`: deterministic baseline rules, no remote model call
+- `slot extraction`: deterministic fixed-schema extraction, no remote model call
+- `retrieval`: local retrieval over indexed chunks
+- `answer generation`: retrieval-backed extractive assembly, not remote-model generation
+- `clarification question`: rules-generated text, not remote-model generation
+- `ticket creation`: structured SQLite write
 
 ## 7. Retrieval and Threshold Rules
 
@@ -214,6 +245,12 @@ Rule:
 - Day 3 retrieval is a minimal local retrieval step implemented with SQLite FTS5 when available
 - if SQLite FTS5 is unavailable, retrieval may fall back to a repository-local lexical implementation without introducing heavyweight frameworks
 
+### 8.5 Snapshot Version Limitation
+
+- `snapshot_version` is still a manifest or batch label
+- it is not yet a content-immutable snapshot identifier
+- this limitation is known and intentionally not solved in Day 4
+
 ## 9. API Contract
 
 ### 9.1 `GET /healthz`
@@ -232,8 +269,8 @@ Day 1 behavior:
 Purpose:
 
 - validate request payload
-- persist a `support_runs` record
-- return a scaffold response shape compatible with the future chain
+- run the synchronous support decision chain
+- persist `support_runs`, and when applicable `retrieval_hits` and `tickets`
 
 Day 1 behavior:
 
@@ -243,6 +280,21 @@ Day 1 behavior:
 - no answer generation
 - no clarification logic
 - no ticket creation logic
+
+Day 4 behavior:
+
+- synchronous `200` response
+- deterministic baseline classification
+- fixed-schema slot extraction
+- manifest-guided retrieval
+- retrieval-backed extractive answer assembly
+- rules-generated clarification text
+- returns one of:
+  - `answered`
+  - `needs_clarification`
+  - `ticket_created`
+- writes retrieval hits when retrieval is executed
+- creates a ticket record when escalation is required
 
 ### 9.3 `GET /v1/runs/{run_id}`
 
@@ -282,6 +334,10 @@ Slot schema must explicitly represent:
 - `version`
 - `error_message`
 - `environment`
+
+Current Day 4 continuation field:
+
+- `SupportAskRequest.follow_up_run_id` may reference one prior clarification run so the second insufficient pass escalates to ticket creation instead of looping clarification
 
 ## 11. Frozen Out of Scope
 

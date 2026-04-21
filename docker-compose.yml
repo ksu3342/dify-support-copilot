@@ -8,4 +8,5 @@ services:
       COPILOT_APP_ENV: docker
       COPILOT_SQLITE_PATH: /app/storage/copilot.db
     volumes:
+      - ./data:/app/data
       - ./storage:/app/storage

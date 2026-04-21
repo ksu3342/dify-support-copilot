@@ -1,12 +1,12 @@
 # Dify Internal Support Copilot
 
-Day 1 scaffold for an internal support copilot focused on self-hosted Dify deployment and maintenance questions.
+An internal support copilot for self-hosted Dify deployment and maintenance questions.
 
 ## What This Repo Is
 
 - A single-purpose internal support triage assistant for self-hosted Dify.
 - A single-corpus system constrained to authoritative Dify documentation.
-- A minimal FastAPI service with SQLite-backed run logging and placeholder API contracts.
+- A minimal FastAPI service with a synchronous SQLite-backed support decision chain and local retrieval.
 
 ## What This Repo Is Not
 
@@ -15,7 +15,7 @@ Day 1 scaffold for an internal support copilot focused on self-hosted Dify deplo
 - Not a generic RAG demo.
 - Not a multi-agent, multi-model, or multi-vector-store system.
 
-## Frozen V1 Scope
+## V1 Target Scope
 
 - Single corpus domain: `Dify`
 - Business categories:
@@ -33,18 +33,32 @@ Day 1 scaffold for an internal support copilot focused on self-hosted Dify deplo
   6. If still insufficient, run the single real action: `create_ticket`
   7. Record logs
 
-## LLM Boundaries
+## V1 Target Model Boundaries
 
-- `classification`: LLM with structured output only. Allowed labels: `deployment`, `configuration`, `knowledge-base`, `integration`, `unclassified`
-- `slot extraction`: rules first, optional LLM assist, fixed schema only:
+This is the intended V1 product boundary, not a claim that the current code already uses remote LLMs.
+
+- `classification`: target is structured model output restricted to `deployment`, `configuration`, `knowledge-base`, `integration`, `unclassified`
+- `slot extraction`: target is rules first with optional model assist, fixed schema only:
   - `deployment_method`
   - `version`
   - `error_message`
   - `environment`
-- `retrieval`: retrieval only, no LLM in retrieval decision
-- `answer generation`: LLM over retrieved evidence with citations
-- `clarification question`: LLM may convert missing slots into a single natural-language question
+- `retrieval`: retrieval only, no model in retrieval decision
+- `answer generation`: target is evidence-grounded answer generation with citations
+- `clarification question`: target is one natural-language clarification question when required
 - `ticket creation`: structured action only, persisted to SQLite
+
+## Current Day 4 Runtime
+
+The current checked-in implementation is a deterministic baseline, not a remote-model system.
+
+- `classification`: deterministic keyword and weighting rules
+- `slot extraction`: deterministic fixed-schema extraction
+- `retrieval`: local retrieval using the current indexed Dify corpus
+- `answer generation`: retrieval-backed extractive assembly from evidence snippets
+- `clarification question`: rule-generated clarification text
+- `ticket creation`: structured SQLite write
+- `snapshot_version`: still a manifest or batch label, not an immutable content snapshot identifier
 
 ## Current Day 1 Delivery
 
@@ -118,6 +132,37 @@ Still not implemented in this round:
 - ticket business logic
 - external embeddings or vector database integration
 
+## Day 4 Delivery
+
+Implemented in this round:
+
+- `POST /v1/support/ask` now runs a real synchronous support chain and returns `200`
+- Deterministic baseline classification
+- Fixed-schema slot extraction for:
+  - `deployment_method`
+  - `version`
+  - `error_message`
+  - `environment`
+- Manifest-guided retrieval using category filtering and light tag-based score boost
+- Deterministic retrieval-backed extractive answers with citations
+- Clarification flow with one-step continuation via `follow_up_run_id`
+- Real ticket creation in SQLite when the request is unclassified or still insufficient after clarification
+- Retrieval hit logging into `retrieval_hits`
+- Clarification text is rule-generated, not remote-model generated
+- Answer assembly is retrieval-backed and extractive, not remote-model generated
+
+Still not implemented in this round:
+
+- remote LLM classification
+- remote LLM answer generation
+- rerank
+- embeddings
+- async worker or queue
+
+Current limitation:
+
+- `snapshot_version` is still a manifest or batch label. It is not yet a content-immutable snapshot version.
+
 Run the Day 2 fetch command with:
 
 ```powershell
@@ -163,6 +208,13 @@ python -m venv .venv
 Then open:
 
 - `http://127.0.0.1:8000/healthz`
+- `http://127.0.0.1:8000/docs`
+
+Example support request:
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/v1/support/ask -ContentType 'application/json' -Body '{"question":"How do I configure chunk settings for a knowledge base in Dify?"}'
+```
 
 ## Test
 
@@ -171,12 +223,24 @@ cd D:\AI agent\dify-support-copilot
 .venv\Scripts\python -m pytest
 ```
 
+Integration tests are self-contained:
+
+- they initialize a temporary SQLite database
+- they seed tracked fixtures from `tests/fixtures/`
+- they do not depend on `storage/copilot.db`
+- they do not depend on existing `data/raw/` or `data/clean/` contents
+
 ## Docker
 
 ```powershell
 cd D:\AI agent\dify-support-copilot
 docker compose up --build
 ```
+
+Docker persistence now mounts both:
+
+- `./storage:/app/storage`
+- `./data:/app/data`
 
 ## Repo Layout
 

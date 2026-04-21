@@ -57,7 +57,10 @@ def search_index(
     top_k: int,
     sqlite_path: str,
     snapshot_version: Optional[str] = None,
+    allowed_source_urls: Optional[List[str]] = None,
 ) -> tuple[str, List[SearchResult]]:
+    if allowed_source_urls is not None and not allowed_source_urls:
+        return "sqlite-fts5", []
     with _connect(sqlite_path) as connection:
         if _fts_table_exists(connection):
             results = _search_with_fts(
@@ -65,6 +68,7 @@ def search_index(
                 query=query,
                 top_k=top_k,
                 snapshot_version=snapshot_version,
+                allowed_source_urls=allowed_source_urls,
             )
             return "sqlite-fts5", results
 
@@ -73,6 +77,7 @@ def search_index(
             query=query,
             top_k=top_k,
             snapshot_version=snapshot_version,
+            allowed_source_urls=allowed_source_urls,
         )
         return "lexical-fallback", results
 
@@ -222,12 +227,18 @@ def _search_with_fts(
     query: str,
     top_k: int,
     snapshot_version: Optional[str],
+    allowed_source_urls: Optional[List[str]],
 ) -> List[SearchResult]:
     parameters: list[object] = [_fts_query(query)]
     snapshot_filter = ""
+    source_filter = ""
     if snapshot_version is not None:
         snapshot_filter = "AND c.snapshot_version = ?"
         parameters.append(snapshot_version)
+    if allowed_source_urls is not None:
+        placeholders = ",".join("?" for _ in allowed_source_urls)
+        source_filter = f"AND c.source_url IN ({placeholders})"
+        parameters.extend(allowed_source_urls)
     parameters.append(top_k)
 
     rows = connection.execute(
@@ -245,6 +256,7 @@ def _search_with_fts(
             ON c.chunk_id = document_chunks_fts.chunk_id
         WHERE document_chunks_fts MATCH ?
           {snapshot_filter}
+          {source_filter}
         ORDER BY bm25(document_chunks_fts) ASC, c.source_url ASC, c.chunk_index ASC
         LIMIT ?
         """,
@@ -269,17 +281,25 @@ def _search_with_lexical_fallback(
     query: str,
     top_k: int,
     snapshot_version: Optional[str],
+    allowed_source_urls: Optional[List[str]],
 ) -> List[SearchResult]:
     terms = _query_terms(query)
     sql = """
         SELECT chunk_id, source_url, snapshot_version, title, chunk_index, content
         FROM document_chunks
     """
-    parameters: tuple[object, ...] = ()
+    filters: List[str] = []
+    parameters: List[object] = []
     if snapshot_version is not None:
-        sql += " WHERE snapshot_version = ?"
-        parameters = (snapshot_version,)
-    rows = connection.execute(sql, parameters).fetchall()
+        filters.append("snapshot_version = ?")
+        parameters.append(snapshot_version)
+    if allowed_source_urls is not None:
+        placeholders = ",".join("?" for _ in allowed_source_urls)
+        filters.append(f"source_url IN ({placeholders})")
+        parameters.extend(allowed_source_urls)
+    if filters:
+        sql += " WHERE " + " AND ".join(filters)
+    rows = connection.execute(sql, tuple(parameters)).fetchall()
 
     scored_results: List[SearchResult] = []
     for row in rows:
