@@ -106,4 +106,13 @@ class HealthResponse(BaseModel):
     status: str
     service: str
     app_env: str
-    sqlite_ready: bool
+    check_type: str
+    sqlite_accessible: bool
+
+
+class ReadinessResponse(BaseModel):
+    ready: bool
+    snapshot_version: str
+    snapshot_count: int
+    chunk_count: int
+    reasons: List[str] = Field(default_factory=list)

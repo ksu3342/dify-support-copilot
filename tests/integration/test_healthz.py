@@ -15,4 +15,5 @@ def test_healthz_returns_ok(tmp_path, monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
-    assert response.json()["sqlite_ready"] is True
+    assert response.json()["check_type"] == "liveness"
+    assert response.json()["sqlite_accessible"] is True

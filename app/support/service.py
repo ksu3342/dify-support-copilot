@@ -9,6 +9,7 @@ from typing import Dict, List, Optional
 from fastapi import HTTPException, status
 
 from app.core.config import Settings
+from app.core.readiness import require_support_readiness
 from app.ingest.fetch import SourceManifest, SourcePage, load_source_manifest
 from app.models.api import (
     Category,
@@ -22,13 +23,12 @@ from app.models.api import (
     TicketRecord,
 )
 from app.models.db import (
-    count_document_chunks,
     get_support_run_state,
     insert_retrieval_hits,
     insert_support_run,
     insert_ticket,
 )
-from app.retrieval.index import SearchResult, build_index, search_index
+from app.retrieval.index import SearchResult, search_index
 
 
 GENERIC_FOLLOW_UP_SLOTS = {
@@ -93,6 +93,7 @@ class SupportDecision:
 
 
 def handle_support_request(request: SupportAskRequest, settings: Settings) -> SupportAskResponse:
+    require_support_readiness(settings)
     manifest = _load_manifest(settings.source_manifest_path)
     previous_run = _load_follow_up_run(request, settings)
 
@@ -103,7 +104,6 @@ def handle_support_request(request: SupportAskRequest, settings: Settings) -> Su
     retrieval_backend: Optional[str] = None
     retrieval_results: List[SearchResult] = []
     if classification.category is not Category.UNCLASSIFIED:
-        _ensure_retrieval_index(settings=settings, snapshot_version=manifest.snapshot_version)
         retrieval_backend, retrieval_results = _retrieve_evidence(
             question=resolved_question,
             category=classification.category,
@@ -542,13 +542,6 @@ def _sanitize_snippet(snippet: str) -> str:
     sanitized = snippet.replace("[", "").replace("]", "")
     sanitized = re.sub(r"\s+", " ", sanitized)
     return sanitized.strip()
-
-
-def _ensure_retrieval_index(settings: Settings, snapshot_version: str) -> None:
-    if count_document_chunks(snapshot_version=snapshot_version, sqlite_path=settings.sqlite_path) == 0:
-        build_index(settings)
-
-
 def _retrieve_evidence(
     question: str,
     category: Category,

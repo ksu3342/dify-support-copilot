@@ -23,6 +23,7 @@ This repo focuses on that narrower but more defensible slice:
 The current implementation supports:
 
 - `GET /healthz`
+- `GET /readyz`
 - `POST /v1/support/ask`
 - `GET /v1/runs/{run_id}`
 - `GET /v1/tickets/{ticket_id}`
@@ -44,6 +45,8 @@ The current implementation supports:
   - `ticket_created`
 - one-turn clarification limit via `follow_up_run_id`
 - retrieval hit logging and SQLite ticket persistence
+- explicit readiness checks for the current manifest snapshot baseline
+- fail-fast `503` responses when support data or chunks are not ready, instead of request-path index builds
 - replay eval cases with threshold verification for the current baseline
 
 ## What This Is Not
@@ -143,9 +146,11 @@ cd D:\AI agent\dify-support-copilot
 .\.venv\Scripts\python -m uvicorn app.api.main:app --host 127.0.0.1 --port 8000
 ```
 
+`/healthz` is a liveness check. `/readyz` is the support-answering readiness check for the current manifest `snapshot_version`.
+
 ## Minimal Demo Flow
 
-### Health check
+### Liveness check
 
 ```powershell
 Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8000/healthz'
@@ -158,9 +163,22 @@ Expected shape:
   "status": "ok",
   "service": "dify-support-copilot",
   "app_env": "dev",
-  "sqlite_ready": true
+  "check_type": "liveness",
+  "sqlite_accessible": true
 }
 ```
+
+### Readiness check
+
+```powershell
+Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8000/readyz'
+```
+
+Expected behavior:
+
+- returns `200` only when the current manifest snapshot corpus is ready
+- returns `503` with reasons when snapshots or chunks are missing
+- `/v1/support/ask` does not implicitly build the index on this path
 
 ### Answered example
 

@@ -125,27 +125,47 @@ def _seed_support_documents(sqlite_path: Path) -> None:
         connection.close()
 
 
-@pytest.fixture
-def support_client(tmp_path, monkeypatch):
-    target_db = tmp_path / "copilot.db"
-
-    monkeypatch.setenv("COPILOT_SQLITE_PATH", str(target_db))
-    monkeypatch.setenv("COPILOT_SOURCE_MANIFEST_PATH", str(SUPPORT_MANIFEST_PATH))
-
+def _clear_runtime_caches() -> None:
     from app.core.config import get_settings
     from app.support.service import _load_manifest
 
     get_settings.cache_clear()
     _load_manifest.cache_clear()
-    settings = get_settings()
 
+
+def _build_client(monkeypatch, sqlite_path: Path, seed_documents: bool):
+    monkeypatch.setenv("COPILOT_SQLITE_PATH", str(sqlite_path))
+    monkeypatch.setenv("COPILOT_SOURCE_MANIFEST_PATH", str(SUPPORT_MANIFEST_PATH))
+
+    _clear_runtime_caches()
+
+    from app.core.config import get_settings
+
+    settings = get_settings()
     init_db(settings.sqlite_path, settings.sqlite_init_script)
-    _seed_support_documents(target_db)
+    if seed_documents:
+        _seed_support_documents(sqlite_path)
 
     from app.api.main import app
 
-    with TestClient(app) as client:
+    return TestClient(app)
+
+
+@pytest.fixture
+def support_client(tmp_path, monkeypatch):
+    target_db = tmp_path / "copilot.db"
+
+    with _build_client(monkeypatch=monkeypatch, sqlite_path=target_db, seed_documents=True) as client:
         yield client, target_db
 
-    get_settings.cache_clear()
-    _load_manifest.cache_clear()
+    _clear_runtime_caches()
+
+
+@pytest.fixture
+def unready_support_client(tmp_path, monkeypatch):
+    target_db = tmp_path / "copilot.db"
+
+    with _build_client(monkeypatch=monkeypatch, sqlite_path=target_db, seed_documents=False) as client:
+        yield client, target_db
+
+    _clear_runtime_caches()

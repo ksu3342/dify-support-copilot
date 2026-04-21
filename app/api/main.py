@@ -1,13 +1,14 @@
 from contextlib import asynccontextmanager
-from pathlib import Path
+import sqlite3
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response, status
 
 from app.api.routes.runs import router as runs_router
 from app.api.routes.support import router as support_router
 from app.api.routes.tickets import router as tickets_router
 from app.core.config import get_settings
-from app.models.api import HealthResponse
+from app.core.readiness import check_support_readiness
+from app.models.api import HealthResponse, ReadinessResponse
 from app.models.db import init_db
 
 
@@ -32,10 +33,35 @@ app.include_router(tickets_router, prefix=get_settings().api_prefix)
 @app.get("/healthz", response_model=HealthResponse, tags=["system"])
 def healthz() -> HealthResponse:
     settings = get_settings()
-    db_ready = Path(settings.sqlite_path).exists()
+    sqlite_accessible = False
+    try:
+        with sqlite3.connect(settings.sqlite_path):
+            sqlite_accessible = True
+    except sqlite3.Error:
+        sqlite_accessible = False
     return HealthResponse(
         status="ok",
         service=settings.app_name,
         app_env=settings.app_env,
-        sqlite_ready=db_ready,
+        check_type="liveness",
+        sqlite_accessible=sqlite_accessible,
+    )
+
+
+@app.get(
+    "/readyz",
+    response_model=ReadinessResponse,
+    responses={status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ReadinessResponse}},
+    tags=["system"],
+)
+def readyz(response: Response) -> ReadinessResponse:
+    readiness = check_support_readiness(get_settings())
+    if not readiness.ready:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    return ReadinessResponse(
+        ready=readiness.ready,
+        snapshot_version=readiness.snapshot_version,
+        snapshot_count=readiness.snapshot_count,
+        chunk_count=readiness.chunk_count,
+        reasons=readiness.reasons,
     )
