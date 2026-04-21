@@ -1,6 +1,12 @@
 import sqlite3
+from pathlib import Path
 
 from fastapi.testclient import TestClient
+
+from app.core.config import REPO_ROOT
+
+
+SUPPORT_MANIFEST_PATH = REPO_ROOT / "tests" / "fixtures" / "support_sources.yaml"
 
 
 def test_readyz_returns_ready_true_for_seeded_support_baseline(support_client):
@@ -38,7 +44,7 @@ def test_readyz_returns_not_ready_when_required_tables_are_missing(tmp_path, mon
     monkeypatch.setenv("COPILOT_SQLITE_PATH", str(target_db))
     monkeypatch.setenv(
         "COPILOT_SOURCE_MANIFEST_PATH",
-        str(r"D:\AI agent\dify-support-copilot\tests\fixtures\support_sources.yaml"),
+        str(SUPPORT_MANIFEST_PATH),
     )
 
     from app.api import main as main_module

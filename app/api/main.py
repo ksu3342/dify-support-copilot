@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 import sqlite3
 
 from fastapi import FastAPI, Response, status
@@ -33,12 +34,7 @@ app.include_router(tickets_router, prefix=get_settings().api_prefix)
 @app.get("/healthz", response_model=HealthResponse, tags=["system"])
 def healthz() -> HealthResponse:
     settings = get_settings()
-    sqlite_accessible = False
-    try:
-        with sqlite3.connect(settings.sqlite_path):
-            sqlite_accessible = True
-    except sqlite3.Error:
-        sqlite_accessible = False
+    sqlite_accessible = _is_sqlite_accessible_read_only(settings.sqlite_path)
     return HealthResponse(
         status="ok",
         service=settings.app_name,
@@ -65,3 +61,15 @@ def readyz(response: Response) -> ReadinessResponse:
         chunk_count=readiness.chunk_count,
         reasons=readiness.reasons,
     )
+
+
+def _is_sqlite_accessible_read_only(sqlite_path: str) -> bool:
+    target_path = Path(sqlite_path)
+    if not target_path.exists():
+        return False
+
+    try:
+        with sqlite3.connect(f"file:{target_path.as_posix()}?mode=ro", uri=True):
+            return True
+    except sqlite3.Error:
+        return False
