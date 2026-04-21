@@ -1,6 +1,6 @@
 # Dify Internal Support Copilot
 
-Deterministic support triage MVP for self-hosted Dify operations: classify a support question, retrieve grounded evidence from official Dify docs, either answer conservatively, ask one clarification, or create a ticket.
+Deterministic support triage MVP for self-hosted Dify: classify a support question, retrieve grounded evidence from official docs, then answer, clarify once, or create a ticket.
 
 ## Why This Project Exists
 
@@ -104,7 +104,7 @@ More detail:
 - PowerShell-friendly CLI scripts
 - Docker / Docker Compose for local packaging
 
-The public-facing wording stays intentionally generic: retrieval is a `lightweight local vector store` step in product framing, while the current Day 3/4 implementation uses SQLite FTS5 as the simplest local retrieval backend.
+Current local retrieval uses SQLite FTS5. This repo does not implement remote embeddings or present retrieval as a standalone vector platform.
 
 ## Corpus Boundary
 
@@ -118,7 +118,7 @@ Authority boundary:
 Snapshot boundary:
 
 - `snapshot_version` is currently a manifest/batch label, not a full immutable history system
-- Day 5 hardening prevents silent content drift inside the same `snapshot_version`
+- the fetch pipeline rejects silent content drift inside the same `snapshot_version`
 - `requested_url` and `final_url` are stored separately to avoid redirect ambiguity
 
 ## Local Run
@@ -257,7 +257,3 @@ This is a local replay eval baseline, not an online experimentation platform.
 - retrieval index/search: [app/retrieval/index.py](/D:/AI%20agent/dify-support-copilot/app/retrieval/index.py)
 - eval runner: [scripts/run_eval.py](/D:/AI%20agent/dify-support-copilot/scripts/run_eval.py)
 - architecture notes: [docs/ARCHITECTURE.md](/D:/AI%20agent/dify-support-copilot/docs/ARCHITECTURE.md)
-
-## Development Notes
-
-This repository was built incrementally across Day 1-7 milestones, but the README no longer mirrors that day-by-day build log. Historical staging can be inferred from commit history; the current docs focus on the project as it exists now.
