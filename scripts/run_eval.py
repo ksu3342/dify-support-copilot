@@ -24,7 +24,11 @@ def main() -> int:
 
     settings = get_settings()
     suite = load_eval_suite(Path(args.eval_path))
-    preflight = preflight_eval(settings=settings, suite=suite)
+    try:
+        preflight = preflight_eval(settings=settings, suite=suite)
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     result = run_eval_suite(settings=settings, suite=suite, min_score=args.min_score)
 
     print(f"suite_id: {result.summary.suite_id}")
