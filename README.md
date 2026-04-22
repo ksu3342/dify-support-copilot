@@ -1,8 +1,8 @@
 # Dify Internal Support Copilot
 
-[简体中文](./README.zh-CN.md)
+[English](./README.en.md)
 
-Deterministic support triage MVP for self-hosted Dify. It classifies a support question, retrieves grounded evidence from official documentation, then answers, asks for one clarification, or creates a ticket.
+一个面向自部署 Dify 场景的 deterministic support triage MVP：接收支持问题，基于官方文档做证据检索，然后在回答、追问一次或建单之间做明确决策。
 
 [![Python](https://img.shields.io/badge/python-3.9%2B-3776AB?logo=python&logoColor=white)](./requirements.txt)
 [![FastAPI](https://img.shields.io/badge/api-FastAPI-009688?logo=fastapi&logoColor=white)](./app/api/main.py)
@@ -22,84 +22,84 @@ python -m venv .venv
 Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8000/readyz'
 ```
 
-`/readyz` is the support-answering readiness check. If it returns `503`, the local corpus or chunk index is not ready yet.
+`/readyz` 才表示当前 support baseline 是否真的可回答问题；如果返回 `503`，说明本地语料或 chunk 索引还没准备好。
 
 ## What This Repo Does
 
-This repository turns a bounded Dify support workflow into a runnable backend service. It does not try to be a general chatbot. It takes one support question, classifies it into a fixed set of categories, retrieves evidence from official Dify docs, and returns one of three outcomes:
+这个仓库把一个受控的 Dify 支持流程落成了可运行的后端服务，而不是泛化成“什么都能聊”的问答系统。输入是一条支持问题，系统会做固定分类、从官方文档里找证据，并输出三种明确结果之一：
 
 - `answered`
 - `needs_clarification`
 - `ticket_created`
 
-The scope is intentionally narrow:
+范围刻意收窄为：
 
-- one product corpus: Dify official English docs
-- one request path: classify -> retrieve -> decide
-- one clarification turn at most
-- one local persistence layer for runs, retrieval hits, tickets, and snapshot metadata
+- 单一语料域：Dify 官方英文文档
+- 单一路径：classify -> retrieve -> decide
+- 最多只追问一轮
+- 本地持久化 runs、retrieval hits、tickets 和 snapshot metadata
 
 ## What Is Implemented
 
-- deterministic support triage for `deployment`, `configuration`, `knowledge-base`, `integration`, and `unclassified`
-- fixed-slot extraction for `deployment_method`, `version`, `error_message`, and `environment`
-- manifest-guided local retrieval over ingested Dify documentation
-- synchronous support outcomes through `POST /v1/support/ask`
-- support follow-up handling through `follow_up_run_id`
-- optional OpenAI-compatible answer synthesis on the `answered` path with deterministic fallback
-- local ingestion, snapshot persistence, and snapshot drift rejection within the same `snapshot_version`
-- replay evaluation for support cases and threshold checks
-- readiness and liveness separation through `GET /readyz` and `GET /healthz`
+- 对 `deployment`、`configuration`、`knowledge-base`、`integration`、`unclassified` 的 deterministic support triage
+- 固定槽位抽取：`deployment_method`、`version`、`error_message`、`environment`
+- 基于 manifest 的本地文档检索
+- `POST /v1/support/ask` 的同步支持链路
+- 通过 `follow_up_run_id` 处理一次补充提问
+- 仅在 `answered` 路径可选启用 OpenAI-compatible answer synthesis，并保留 deterministic fallback
+- 本地文档抓取、快照落盘、元数据入库，以及同一 `snapshot_version` 下的内容漂移拒绝覆盖
+- replay eval 与阈值校验
+- 通过 `GET /healthz` 和 `GET /readyz` 区分 liveness 与 readiness
 
 ## Why It Is Designed This Way
 
-- Deterministic first: the current baseline stays runnable without model credentials and keeps decision behavior inspectable.
-- Single corpus: support answers stay grounded in official Dify documentation instead of mixed web sources.
-- Explicit escalation: vague or low-evidence questions should fail into clarification or ticketing, not forced answers.
-- Local evidence trail: runs, retrieval hits, tickets, and replay artifacts make the current behavior auditable.
+- 先做 deterministic baseline：当前主链在没有外部模型密钥时也能运行；`answered` 路径的可选 LLM synthesis 只是增强项，不是硬依赖。
+- 只保留单一官方语料：支持回答必须建立在 Dify 官方文档上，而不是混入论坛或博客。
+- 把升级当成能力的一部分：证据不足时先追问，再建单，比勉强回答更诚实。
+- 把证据链落地：runs、retrieval hits、tickets、eval artifacts 都留在本地，方便复盘。
 
 ## Engineering Evidence
 
-The current claims are backed by code and runnable entry points in the repository:
+仓库里可以直接证明当前说法成立的入口：
 
-- API entry and health endpoints: [`app/api/main.py`](./app/api/main.py)
-- support decision flow: [`app/support/service.py`](./app/support/service.py)
-- local retrieval and indexing entry: [`app/retrieval/index.py`](./app/retrieval/index.py)
-- ingestion and snapshot handling: [`app/ingest/`](./app/ingest/)
-- SQLite schema and persistence helpers: [`scripts/init_db.sql`](./scripts/init_db.sql), [`app/models/db.py`](./app/models/db.py)
-- integration and unit coverage: [`tests/`](./tests/)
-- replay evaluation runner: [`scripts/run_eval.py`](./scripts/run_eval.py)
-- container packaging entry: [`Dockerfile`](./Dockerfile), [`docker-compose.yml`](./docker-compose.yml)
+- API 入口与健康检查：[`app/api/main.py`](./app/api/main.py)
+- 支持决策主链：[`app/support/service.py`](./app/support/service.py)
+- 本地检索与索引构建：[`app/retrieval/index.py`](./app/retrieval/index.py)
+- 文档抓取与快照处理：[`app/ingest/`](./app/ingest/)
+- SQLite schema 与持久化：[`scripts/init_db.sql`](./scripts/init_db.sql)、[`app/models/db.py`](./app/models/db.py)
+- 集成与单元测试：[`tests/`](./tests/)
+- replay eval 入口：[`scripts/run_eval.py`](./scripts/run_eval.py)
+- 容器化打包入口：[`Dockerfile`](./Dockerfile)、[`docker-compose.yml`](./docker-compose.yml)
 
 ## Boundaries / Non-goals
 
-This project is:
+这个项目是：
 
-- an AI application prototype
-- a Python backend service
-- a bounded support baseline for self-hosted Dify operations
+- AI 应用原型
+- Python 后端服务
+- 面向自部署 Dify 场景的受控 support baseline
 
-This project is not:
+这个项目不是：
 
-- a remote-LLM support service
-- a multiple-agent runtime
-- a frontend or dashboard product
-- an async worker or queue-based system
-- an embedding-based retrieval stack
-- a production deployment target
+- 远程 LLM 支持系统
+- 多智能体运行时
+- 前端或 dashboard 产品
+- 基于队列的异步系统
+- embedding 检索栈
+- 面向生产部署的平台
 
-Deliberate omissions:
+刻意不做的部分：
 
-- no external model provider integration
-- no LLM-based classification or clarification
-- no broad multi-source knowledge corpus
-- no memory layer or long-running conversation state
-- no infrastructure abstraction for multiple retrieval backends
+- 不让主链强依赖外部模型提供方
+- 不做基于 LLM 的 classification 或 clarification
+- 不扩成多来源知识平台
+- 不做 memory 或长期会话状态
+- 不抽象多套 retrieval backend
 
 ## Further Reading
 
-- architecture notes: [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
-- demo script: [`docs/DEMO_SCRIPT.md`](./docs/DEMO_SCRIPT.md)
-- interview notes: [`docs/INTERVIEW_NOTES.md`](./docs/INTERVIEW_NOTES.md)
-- resume-safe project bullets: [`docs/RESUME_BULLETS.md`](./docs/RESUME_BULLETS.md)
-- current implementation details and frozen scope record: [`SPEC.md`](./SPEC.md)
+- 架构说明：[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
+- 演示脚本：[`docs/DEMO_SCRIPT.md`](./docs/DEMO_SCRIPT.md)
+- 面试讲解素材：[`docs/INTERVIEW_NOTES.md`](./docs/INTERVIEW_NOTES.md)
+- 可安全写进简历的 bullet：[`docs/RESUME_BULLETS.md`](./docs/RESUME_BULLETS.md)
+- 当前实现范围与冻结规格：[`SPEC.md`](./SPEC.md)
