@@ -46,6 +46,7 @@ The scope is intentionally narrow:
 - manifest-guided local retrieval over ingested Dify documentation
 - synchronous support outcomes through `POST /v1/support/ask`
 - support follow-up handling through `follow_up_run_id`
+- optional OpenAI-compatible answer synthesis on the `answered` path with deterministic fallback
 - local ingestion, snapshot persistence, and snapshot drift rejection within the same `snapshot_version`
 - replay evaluation for support cases and threshold checks
 - readiness and liveness separation through `GET /readyz` and `GET /healthz`
@@ -90,6 +91,7 @@ This project is not:
 Deliberate omissions:
 
 - no external model provider integration
+- no LLM-based classification or clarification
 - no broad multi-source knowledge corpus
 - no memory layer or long-running conversation state
 - no infrastructure abstraction for multiple retrieval backends

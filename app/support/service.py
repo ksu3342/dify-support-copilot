@@ -11,6 +11,7 @@ from fastapi import HTTPException, status
 from app.core.config import Settings
 from app.core.readiness import require_support_readiness
 from app.ingest.fetch import SourceManifest, SourcePage, load_source_manifest
+from app.llm.client import LLMClientError, is_llm_configured, synthesize_grounded_answer
 from app.models.api import (
     Category,
     Citation,
@@ -122,6 +123,17 @@ def handle_support_request(request: SupportAskRequest, settings: Settings) -> Su
         is_follow_up=previous_run is not None,
     )
 
+    answered_answer = decision.answer
+    answer_generation_mode: Optional[str] = None
+    synthesis_notes: List[str] = []
+    if decision.status is RunStatus.ANSWERED:
+        answered_answer, answer_generation_mode, synthesis_notes = _synthesize_answer(
+            question=decision.resolved_question,
+            deterministic_answer=decision.answer or "",
+            citations=decision.citations,
+            settings=settings,
+        )
+
     run_payload = {
         "input": request.model_dump(mode="json"),
         "resolved_question": decision.resolved_question,
@@ -129,6 +141,7 @@ def handle_support_request(request: SupportAskRequest, settings: Settings) -> Su
         "follow_up_run_id": request.follow_up_run_id,
         "is_follow_up": decision.is_follow_up,
         "retrieval_backend": decision.retrieval_backend,
+        "answer_generation_mode": answer_generation_mode,
     }
     run = insert_support_run(
         question=decision.resolved_question,
@@ -165,7 +178,8 @@ def handle_support_request(request: SupportAskRequest, settings: Settings) -> Su
 
     return SupportAskResponse(
         run=run,
-        answer=decision.answer,
+        answer=answered_answer,
+        answer_generation_mode=answer_generation_mode,
         citations=decision.citations,
         clarification=decision.clarification,
         ticket=ticket,
@@ -176,10 +190,7 @@ def handle_support_request(request: SupportAskRequest, settings: Settings) -> Su
             "retrieval_hit_logging",
             "ticket_creation",
         ],
-        notes=[
-            "Day 4 uses a deterministic baseline for classification and answer generation. No remote LLM is called.",
-            "Retrieval is filtered by manifest category and lightly boosted by manifest tags.",
-        ],
+        notes=_build_response_notes(answer_generation_mode=answer_generation_mode, synthesis_notes=synthesis_notes),
     )
 
 
@@ -542,6 +553,65 @@ def _sanitize_snippet(snippet: str) -> str:
     sanitized = snippet.replace("[", "").replace("]", "")
     sanitized = re.sub(r"\s+", " ", sanitized)
     return sanitized.strip()
+
+
+def _synthesize_answer(
+    question: str,
+    deterministic_answer: str,
+    citations: List[Citation],
+    settings: Settings,
+) -> tuple[str, str, List[str]]:
+    mode = settings.answer_synthesis_mode.strip().lower()
+    if mode not in {"deterministic", "llm", "auto"}:
+        mode = "deterministic"
+
+    if mode == "deterministic":
+        return deterministic_answer, "deterministic", []
+
+    if mode == "auto" and not is_llm_configured(settings):
+        return deterministic_answer, "deterministic", [
+            "LLM answer synthesis was not configured; deterministic answer assembly was used."
+        ]
+
+    if mode == "llm" and not is_llm_configured(settings):
+        return deterministic_answer, "deterministic_fallback", [
+            "LLM answer synthesis mode was requested but configuration was incomplete; deterministic fallback was used."
+        ]
+
+    try:
+        llm_answer = synthesize_grounded_answer(
+            question=question,
+            citations=citations,
+            settings=settings,
+        )
+        return llm_answer, "llm", [
+            "Answered path used OpenAI-compatible LLM synthesis with grounded evidence."
+        ]
+    except LLMClientError as exc:
+        return deterministic_answer, "deterministic_fallback", [
+            f"LLM answer synthesis failed and deterministic fallback was used: {exc}"
+        ]
+
+
+def _build_response_notes(answer_generation_mode: Optional[str], synthesis_notes: List[str]) -> List[str]:
+    notes = [
+        "Classification remains deterministic; clarification and ticket rules do not call the LLM.",
+        "Retrieval is filtered by manifest category and lightly boosted by manifest tags.",
+    ]
+    if answer_generation_mode in {"deterministic", "deterministic_fallback", None}:
+        notes.insert(
+            0,
+            "Answered path defaults to deterministic answer assembly unless LLM synthesis is enabled and available.",
+        )
+    else:
+        notes.insert(
+            0,
+            "Answered path used optional OpenAI-compatible LLM synthesis with grounded retrieval evidence.",
+        )
+    notes.extend(synthesis_notes)
+    return notes
+
+
 def _retrieve_evidence(
     question: str,
     category: Category,

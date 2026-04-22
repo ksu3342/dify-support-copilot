@@ -95,6 +95,7 @@ class SnapshotRecord(BaseModel):
 class SupportAskResponse(BaseModel):
     run: RunRecord
     answer: Optional[str] = None
+    answer_generation_mode: Optional[str] = None
     citations: List[Citation] = Field(default_factory=list)
     clarification: Optional[ClarificationPrompt] = None
     ticket: Optional[TicketRecord] = None

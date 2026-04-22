@@ -136,6 +136,11 @@ def _clear_runtime_caches() -> None:
 def _build_client(monkeypatch, sqlite_path: Path, seed_documents: bool):
     monkeypatch.setenv("COPILOT_SQLITE_PATH", str(sqlite_path))
     monkeypatch.setenv("COPILOT_SOURCE_MANIFEST_PATH", str(SUPPORT_MANIFEST_PATH))
+    monkeypatch.setenv("COPILOT_ANSWER_SYNTHESIS_MODE", "deterministic")
+    monkeypatch.delenv("COPILOT_LLM_API_KEY", raising=False)
+    monkeypatch.delenv("COPILOT_LLM_BASE_URL", raising=False)
+    monkeypatch.delenv("COPILOT_LLM_MODEL", raising=False)
+    monkeypatch.delenv("COPILOT_LLM_TIMEOUT_SECONDS", raising=False)
 
     _clear_runtime_caches()
 

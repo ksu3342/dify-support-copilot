@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     chunk_min_chars: int = 400
     support_retrieval_top_k: int = 5
     support_citation_top_k: int = 2
+    answer_synthesis_mode: str = "deterministic"
+    llm_api_key: str = ""
+    llm_base_url: str = ""
+    llm_model: str = ""
+    llm_timeout_seconds: float = 20.0
     min_evidence_hits: int = 2
     min_score: float = 0.35
     min_score_note: str = "retained after replay sweep on support_eval_v1; no safer improvement observed in 0.20-0.45"

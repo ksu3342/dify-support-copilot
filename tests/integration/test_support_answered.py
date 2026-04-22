@@ -14,6 +14,7 @@ def test_support_ask_answered_returns_grounded_citations(support_client):
     assert payload["run"]["status"] == "answered"
     assert payload["run"]["category"] == "knowledge-base"
     assert payload["answer"]
+    assert payload["answer_generation_mode"] == "deterministic"
     assert payload["citations"]
     assert any("chunking-and-cleaning-text" in citation["source_url"] for citation in payload["citations"])
 

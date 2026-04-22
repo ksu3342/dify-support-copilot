@@ -46,6 +46,7 @@ Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8000/readyz'
 - 基于 manifest 的本地文档检索
 - `POST /v1/support/ask` 的同步支持链路
 - 通过 `follow_up_run_id` 处理一次补充提问
+- 仅在 `answered` 路径可选启用 OpenAI-compatible answer synthesis，并保留 deterministic fallback
 - 本地文档抓取、快照落盘、元数据入库，以及同一 `snapshot_version` 下的内容漂移拒绝覆盖
 - replay eval 与阈值校验
 - 通过 `GET /healthz` 和 `GET /readyz` 区分 liveness 与 readiness
@@ -90,6 +91,7 @@ Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8000/readyz'
 刻意不做的部分：
 
 - 不接外部模型提供方
+- 不做基于 LLM 的 classification 或 clarification
 - 不扩成多来源知识平台
 - 不做 memory 或长期会话状态
 - 不抽象多套 retrieval backend
