@@ -1,277 +1,103 @@
 # Dify Internal Support Copilot
 
-Deterministic support triage MVP for self-hosted Dify: classify a support question, retrieve grounded evidence from official docs, then answer, clarify once, or create a ticket.
+[简体中文](./README.zh-CN.md)
 
-## Why This Project Exists
+Deterministic support triage MVP for self-hosted Dify. It classifies a support question, retrieves grounded evidence from official documentation, then answers, asks for one clarification, or creates a ticket.
 
-Most Dify support demos stop at "chat over docs". That misses the real internal support workflow:
+[![Python](https://img.shields.io/badge/python-3.9%2B-3776AB?logo=python&logoColor=white)](./requirements.txt)
+[![FastAPI](https://img.shields.io/badge/api-FastAPI-009688?logo=fastapi&logoColor=white)](./app/api/main.py)
+[![Support%20Flow](https://img.shields.io/badge/support%20flow-deterministic-1F6FEB)](./app/support/service.py)
+[![Tests](https://img.shields.io/badge/tests-pytest-6DB33F)](./tests/)
+[![Replay%20Eval](https://img.shields.io/badge/eval-replay-F59E0B)](./scripts/run_eval.py)
+[![Architecture](https://img.shields.io/badge/docs-architecture-6B7280)](./docs/ARCHITECTURE.md)
 
-- questions are not always answerable on first turn
-- vague problem reports should not be answered too confidently
-- support needs escalation paths, retrieval logs, and replayable evaluation
-- self-hosted support depends on a bounded, authoritative corpus rather than open-ended web search
-
-This repo focuses on that narrower but more defensible slice:
-
-- single product corpus: Dify official English docs
-- single support chain: classify -> retrieve -> answer / clarify / ticket
-- deterministic baseline instead of remote LLM dependency
-- replay eval to measure behavior changes before changing rules
-
-## Current Capabilities
-
-The current implementation supports:
-
-- `GET /healthz`
-- `GET /readyz`
-- `POST /v1/support/ask`
-- `GET /v1/runs/{run_id}`
-- `GET /v1/tickets/{ticket_id}`
-- deterministic classification into:
-  - `deployment`
-  - `configuration`
-  - `knowledge-base`
-  - `integration`
-  - `unclassified`
-- fixed slot extraction for:
-  - `deployment_method`
-  - `version`
-  - `error_message`
-  - `environment`
-- manifest-guided retrieval over locally indexed Dify documentation
-- three synchronous support outcomes:
-  - `answered`
-  - `needs_clarification`
-  - `ticket_created`
-- one-turn clarification limit via `follow_up_run_id`
-- retrieval hit logging and SQLite ticket persistence
-- explicit readiness checks for the current manifest snapshot baseline
-- fail-fast `503` responses when support data or chunks are not ready, instead of request-path index builds
-- replay eval cases with threshold verification for the current baseline
-
-## What This Is Not
-
-This repository is intentionally not:
-
-- a remote-LLM support system
-- a generic agent framework
-- a multi-agent orchestration demo
-- a production-grade support platform
-- a dashboard or frontend product
-- a multi-source knowledge platform
-- a vector database benchmark
-
-Current answer generation is retrieval-backed extractive assembly. Current classification is deterministic. Clarification text is rule-generated. No external model provider is called.
-
-## Architecture Overview
-
-```mermaid
-flowchart TD
-    A["User question"] --> B["Deterministic classification"]
-    B --> C["Fixed-slot extraction"]
-    C --> D["Manifest-guided retrieval"]
-    D --> E{"Decision rules"}
-    E -->|enough evidence| F["answered + citations"]
-    E -->|needs one more turn| G["needs_clarification"]
-    E -->|still insufficient / unclassified| H["ticket_created"]
-    D --> I["retrieval_hits in SQLite"]
-    F --> J["support_runs in SQLite"]
-    G --> J
-    H --> K["tickets in SQLite"]
-    H --> J
-```
-
-Key data flow:
-
-- source manifest lives in [`data/sources.yaml`](/D:/AI%20agent/dify-support-copilot/data/sources.yaml)
-- raw and cleaned documentation snapshots are fetched locally
-- cleaned text is chunked and indexed into SQLite FTS5
-- `/v1/support/ask` reuses that local retrieval layer
-- replay eval replays version-controlled support cases against the same chain
-
-More detail:
-
-- architecture notes: [docs/ARCHITECTURE.md](/D:/AI%20agent/dify-support-copilot/docs/ARCHITECTURE.md)
-- demo script: [docs/DEMO_SCRIPT.md](/D:/AI%20agent/dify-support-copilot/docs/DEMO_SCRIPT.md)
-- interview notes: [docs/INTERVIEW_NOTES.md](/D:/AI%20agent/dify-support-copilot/docs/INTERVIEW_NOTES.md)
-- resume bullets: [docs/RESUME_BULLETS.md](/D:/AI%20agent/dify-support-copilot/docs/RESUME_BULLETS.md)
-
-## Tech Stack
-
-- Python
-- FastAPI
-- Pydantic
-- SQLite
-- SQLite FTS5 for local lexical retrieval
-- pytest
-- PowerShell-friendly CLI scripts
-- Docker / Docker Compose for local packaging
-
-Current local retrieval uses SQLite FTS5. This repo does not implement remote embeddings or present retrieval as a standalone vector platform.
-
-## Corpus Boundary
-
-Authority boundary:
-
-- single corpus domain: Dify
-- official English docs only
-- primary authority: `docs.dify.ai`
-- no forum/blog/issues backfilled into the knowledge base
-
-Snapshot boundary:
-
-- `snapshot_version` is currently a manifest/batch label, not a full immutable history system
-- the fetch pipeline rejects silent content drift inside the same `snapshot_version`
-- `requested_url` and `final_url` are stored separately to avoid redirect ambiguity
-
-## Local Run
-
-### 1. Install dependencies
+## Quick Start
 
 ```powershell
-cd D:\AI agent\dify-support-copilot
+python -m venv .venv
 .\.venv\Scripts\python -m pip install -r requirements.txt
-```
-
-### 2. Fetch docs and build the local index
-
-```powershell
 .\.venv\Scripts\python scripts\fetch_sources.py
 .\.venv\Scripts\python scripts\build_index.py
-```
-
-### 3. Start the API
-
-```powershell
 .\.venv\Scripts\python -m uvicorn app.api.main:app --host 127.0.0.1 --port 8000
-```
-
-`/healthz` is a liveness check. `/readyz` is the support-answering readiness check for the current manifest `snapshot_version`.
-
-## Minimal Demo Flow
-
-### Liveness check
-
-```powershell
-Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8000/healthz'
-```
-
-Expected shape:
-
-```json
-{
-  "status": "ok",
-  "service": "dify-support-copilot",
-  "app_env": "dev",
-  "check_type": "liveness",
-  "sqlite_accessible": true
-}
-```
-
-### Readiness check
-
-```powershell
 Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8000/readyz'
 ```
 
-Expected behavior:
+`/readyz` is the support-answering readiness check. If it returns `503`, the local corpus or chunk index is not ready yet.
 
-- returns `200` only when the current manifest snapshot corpus is ready
-- returns `503` with reasons when snapshots or chunks are missing
-- `/v1/support/ask` does not implicitly build the index on this path
+## What This Repo Does
 
-### Answered example
+This repository turns a bounded Dify support workflow into a runnable backend service. It does not try to be a general chatbot. It takes one support question, classifies it into a fixed set of categories, retrieves evidence from official Dify docs, and returns one of three outcomes:
 
-```powershell
-$answered = Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8000/v1/support/ask' -ContentType 'application/json' -Body '{
-  "question": "How do I configure chunk settings for a knowledge base in Dify?"
-}'
-$answered | ConvertTo-Json -Depth 6
-```
+- `answered`
+- `needs_clarification`
+- `ticket_created`
 
-Expected behavior:
+The scope is intentionally narrow:
 
-- `run.status = "answered"`
-- `answer` is non-empty
-- `citations` is non-empty
+- one product corpus: Dify official English docs
+- one request path: classify -> retrieve -> decide
+- one clarification turn at most
+- one local persistence layer for runs, retrieval hits, tickets, and snapshot metadata
 
-### Clarification example
+## What Is Implemented
 
-```powershell
-$clarify = Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8000/v1/support/ask' -ContentType 'application/json' -Body '{
-  "question": "My plugin integration fails."
-}'
-$clarify | ConvertTo-Json -Depth 6
-```
+- deterministic support triage for `deployment`, `configuration`, `knowledge-base`, `integration`, and `unclassified`
+- fixed-slot extraction for `deployment_method`, `version`, `error_message`, and `environment`
+- manifest-guided local retrieval over ingested Dify documentation
+- synchronous support outcomes through `POST /v1/support/ask`
+- support follow-up handling through `follow_up_run_id`
+- local ingestion, snapshot persistence, and snapshot drift rejection within the same `snapshot_version`
+- replay evaluation for support cases and threshold checks
+- readiness and liveness separation through `GET /readyz` and `GET /healthz`
 
-Expected behavior:
+## Why It Is Designed This Way
 
-- `run.status = "needs_clarification"`
-- `clarification.question` is non-empty
-- `clarification.missing_slots` is non-empty
+- Deterministic first: the current baseline stays runnable without model credentials and keeps decision behavior inspectable.
+- Single corpus: support answers stay grounded in official Dify documentation instead of mixed web sources.
+- Explicit escalation: vague or low-evidence questions should fail into clarification or ticketing, not forced answers.
+- Local evidence trail: runs, retrieval hits, tickets, and replay artifacts make the current behavior auditable.
 
-### Follow-up to ticket example
+## Engineering Evidence
 
-```powershell
-$followUpBody = @{
-  question = "Still failing after I retried the integration."
-  follow_up_run_id = $clarify.run.run_id
-} | ConvertTo-Json
+The current claims are backed by code and runnable entry points in the repository:
 
-$ticket = Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8000/v1/support/ask' -ContentType 'application/json' -Body $followUpBody
-$ticket | ConvertTo-Json -Depth 6
-```
+- API entry and health endpoints: [`app/api/main.py`](./app/api/main.py)
+- support decision flow: [`app/support/service.py`](./app/support/service.py)
+- local retrieval and indexing entry: [`app/retrieval/index.py`](./app/retrieval/index.py)
+- ingestion and snapshot handling: [`app/ingest/`](./app/ingest/)
+- SQLite schema and persistence helpers: [`scripts/init_db.sql`](./scripts/init_db.sql), [`app/models/db.py`](./app/models/db.py)
+- integration and unit coverage: [`tests/`](./tests/)
+- replay evaluation runner: [`scripts/run_eval.py`](./scripts/run_eval.py)
+- container packaging entry: [`Dockerfile`](./Dockerfile), [`docker-compose.yml`](./docker-compose.yml)
 
-Expected behavior:
+## Boundaries / Non-goals
 
-- `run.status = "ticket_created"`
-- `ticket.ticket_id` is present
+This project is:
 
-Full step-by-step version:
+- an AI application prototype
+- a Python backend service
+- a bounded support baseline for self-hosted Dify operations
 
-- [docs/DEMO_SCRIPT.md](/D:/AI%20agent/dify-support-copilot/docs/DEMO_SCRIPT.md)
+This project is not:
 
-## Replay Eval Summary
+- a remote-LLM support service
+- a multiple-agent runtime
+- a frontend or dashboard product
+- an async worker or queue-based system
+- an embedding-based retrieval stack
+- a production deployment target
 
-Current local replay baseline uses version-controlled support cases in [`data/evals/support_eval_v1.yaml`](/D:/AI%20agent/dify-support-copilot/data/evals/support_eval_v1.yaml).
+Deliberate omissions:
 
-Coverage:
+- no external model provider integration
+- no broad multi-source knowledge corpus
+- no memory layer or long-running conversation state
+- no infrastructure abstraction for multiple retrieval backends
 
-- 4 categories: deployment / configuration / knowledge-base / integration
-- 3 outcomes: answered / needs_clarification / ticket_created
-- includes two-turn escalation cases
+## Further Reading
 
-Current baseline summary:
-
-- `status_accuracy = 1.00`
-- `category_accuracy = 1.00`
-- `answered_citation_hit_rate = 1.00`
-- `clarification_slot_match_rate = 1.00`
-- `ticket_path_pass_rate = 1.00`
-
-Run locally:
-
-```powershell
-.\.venv\Scripts\python scripts\run_eval.py
-```
-
-This is a local replay eval baseline, not an online experimentation platform.
-
-## Known Limitations
-
-- no remote LLM provider is integrated
-- answer style is conservative and extractive, not conversational synthesis
-- only one product corpus is supported
-- retrieval is lexical local retrieval, not embedding-based semantic search
-- clarification logic is rule-based and intentionally narrow
-- one clarification turn only
-- `snapshot_version` is not a full immutable version-management system
-- no frontend, queue, auth layer, or dashboard
-
-## Repository Map
-
-- API entry: [app/api/main.py](/D:/AI%20agent/dify-support-copilot/app/api/main.py)
-- support decision chain: [app/support/service.py](/D:/AI%20agent/dify-support-copilot/app/support/service.py)
-- retrieval index/search: [app/retrieval/index.py](/D:/AI%20agent/dify-support-copilot/app/retrieval/index.py)
-- eval runner: [scripts/run_eval.py](/D:/AI%20agent/dify-support-copilot/scripts/run_eval.py)
-- architecture notes: [docs/ARCHITECTURE.md](/D:/AI%20agent/dify-support-copilot/docs/ARCHITECTURE.md)
+- architecture notes: [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
+- demo script: [`docs/DEMO_SCRIPT.md`](./docs/DEMO_SCRIPT.md)
+- interview notes: [`docs/INTERVIEW_NOTES.md`](./docs/INTERVIEW_NOTES.md)
+- resume-safe project bullets: [`docs/RESUME_BULLETS.md`](./docs/RESUME_BULLETS.md)
+- current implementation details and frozen scope record: [`SPEC.md`](./SPEC.md)
