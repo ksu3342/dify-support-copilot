@@ -1,15 +1,10 @@
 # Dify Internal Support Copilot
 
-[English](./README.en.md)
+[English](./README.en.md) | [旧中文入口](./README.zh-CN.md)
 
-一个面向自部署 Dify 场景的 deterministic support triage MVP：接收支持问题，基于官方文档做证据检索，然后在回答、追问一次或建单之间做明确决策。
+面向 self-hosted Dify 运维支持场景的证据驱动 support triage backend。
 
-[![Python](https://img.shields.io/badge/python-3.9%2B-3776AB?logo=python&logoColor=white)](./requirements.txt)
-[![FastAPI](https://img.shields.io/badge/api-FastAPI-009688?logo=fastapi&logoColor=white)](./app/api/main.py)
-[![Support%20Flow](https://img.shields.io/badge/support%20flow-deterministic-1F6FEB)](./app/support/service.py)
-[![Tests](https://img.shields.io/badge/tests-pytest-6DB33F)](./tests/)
-[![Replay%20Eval](https://img.shields.io/badge/eval-replay-F59E0B)](./scripts/run_eval.py)
-[![Architecture](https://img.shields.io/badge/docs-architecture-6B7280)](./docs/ARCHITECTURE.md)
+Self-hosted Dify 的支持问题通常分散在安装、配置、知识库、插件/API 集成等文档里。这个项目把这类请求整理成一条可运行的后端链路：读取官方文档证据，判断问题类型，检索相关内容，然后在 `answered`、`needs_clarification`、`ticket_created` 之间做明确分流。
 
 ## Quick Start
 
@@ -22,84 +17,162 @@ python -m venv .venv
 Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8000/readyz'
 ```
 
-`/readyz` 才表示当前 support baseline 是否真的可回答问题；如果返回 `503`，说明本地语料或 chunk 索引还没准备好。
+`/healthz` 只表示服务存活；`/readyz` 才表示当前 Dify 文档快照和 chunk 索引已经准备好，可以回答 support 问题。
 
-## What This Repo Does
+## 一个支持请求如何被处理
 
-这个仓库把一个受控的 Dify 支持流程落成了可运行的后端服务，而不是泛化成“什么都能聊”的问答系统。输入是一条支持问题，系统会做固定分类、从官方文档里找证据，并输出三种明确结果之一：
+下面样例来自当前仓库本地 API 验证，不是手写的理想输出。
 
-- `answered`
-- `needs_clarification`
-- `ticket_created`
+**Question**
 
-范围刻意收窄为：
+```text
+How do I configure chunk settings for a knowledge base in Dify?
+```
 
-- 单一语料域：Dify 官方英文文档
-- 单一路径：classify -> retrieve -> decide
-- 最多只追问一轮
-- 本地持久化 runs、retrieval hits、tickets 和 snapshot metadata
+**Classification**
 
-## What Is Implemented
+```json
+{
+  "status": "answered",
+  "category": "knowledge-base",
+  "answer_generation_mode": "deterministic"
+}
+```
 
-- 对 `deployment`、`configuration`、`knowledge-base`、`integration`、`unclassified` 的 deterministic support triage
-- 固定槽位抽取：`deployment_method`、`version`、`error_message`、`environment`
-- 基于 manifest 的本地文档检索
-- `POST /v1/support/ask` 的同步支持链路
-- 通过 `follow_up_run_id` 处理一次补充提问
-- 仅在 `answered` 路径可选启用 OpenAI-compatible answer synthesis，并保留 deterministic fallback
-- 本地文档抓取、快照落盘、元数据入库，以及同一 `snapshot_version` 下的内容漂移拒绝覆盖
-- replay eval 与阈值校验
-- 通过 `GET /healthz` 和 `GET /readyz` 区分 liveness 与 readiness
+**Retrieved evidence**
 
-## Why It Is Designed This Way
+```json
+[
+  {
+    "chunk_id": "chunk_0a2e3366da743c0b1403aaee",
+    "source_url": "https://docs.dify.ai/en/guides/knowledge-base/create-knowledge-and-upload-documents/chunking-and-cleaning-text",
+    "snapshot_version": "dify-docs-en-2026-04-21-v2",
+    "title": "Configure the Chunk Settings - Dify Docs",
+    "chunk_index": 1
+  },
+  {
+    "chunk_id": "chunk_1ddcceb284436856cbeaec27",
+    "source_url": "https://docs.dify.ai/en/use-dify/knowledge/create-knowledge/setting-indexing-methods",
+    "snapshot_version": "dify-docs-en-2026-04-21-v2",
+    "title": "Specify the Index Method and Retrieval Settings - Dify Docs",
+    "chunk_index": 8
+  }
+]
+```
 
-- 先做 deterministic baseline：当前主链在没有外部模型密钥时也能运行；`answered` 路径的可选 LLM synthesis 只是增强项，不是硬依赖。
-- 只保留单一官方语料：支持回答必须建立在 Dify 官方文档上，而不是混入论坛或博客。
-- 把升级当成能力的一部分：证据不足时先追问，再建单，比勉强回答更诚实。
-- 把证据链落地：runs、retrieval hits、tickets、eval artifacts 都留在本地，方便复盘。
+**Answer snippet**
 
-## Engineering Evidence
+```text
+Relevant Dify documentation excerpts:
+- Configure the Chunk Settings - Dify Docs: ... a Chunk Mode The chunk mode cannot be changed once the knowledge base is created. However, chunk settings ...
+- Specify the Index Method and Retrieval Settings - Dify Docs: ... Utilizing embedding models, even if the exact terms from the query do not appear in the knowledge base ...
+```
 
-仓库里可以直接证明当前说法成立的入口：
+另外两条主链路径也有 integration coverage：
 
-- API 入口与健康检查：[`app/api/main.py`](./app/api/main.py)
-- 支持决策主链：[`app/support/service.py`](./app/support/service.py)
-- 本地检索与索引构建：[`app/retrieval/index.py`](./app/retrieval/index.py)
-- 文档抓取与快照处理：[`app/ingest/`](./app/ingest/)
-- SQLite schema 与持久化：[`scripts/init_db.sql`](./scripts/init_db.sql)、[`app/models/db.py`](./app/models/db.py)
-- 集成与单元测试：[`tests/`](./tests/)
-- replay eval 入口：[`scripts/run_eval.py`](./scripts/run_eval.py)
-- 容器化打包入口：[`Dockerfile`](./Dockerfile)、[`docker-compose.yml`](./docker-compose.yml)
+- `My plugin integration fails.` -> `needs_clarification`
+- `Still failing after I retried the integration.` with `follow_up_run_id` -> `ticket_created`
 
-## Boundaries / Non-goals
+## 这个项目在做什么
 
-这个项目是：
+这个仓库不是泛化聊天机器人。它把 self-hosted Dify 的内部支持请求收敛到一个可检查的后端 baseline：
 
-- AI 应用原型
-- Python 后端服务
-- 面向自部署 Dify 场景的受控 support baseline
+- 从 Dify 官方英文文档抓取、清洗并保存本地快照
+- 基于 manifest metadata 做分类后的定向检索
+- 对支持问题执行固定类别分流
+- 证据足够时回答并保留 citation
+- 信息不足时只追问一次
+- 仍不足或无法归类时创建本地 ticket
+- 记录 run、retrieval hits、tickets 和 snapshot metadata
+- 用 replay eval 回放当前支持行为
 
-这个项目不是：
+## 当前已实现
 
-- 远程 LLM 支持系统
-- 多智能体运行时
-- 前端或 dashboard 产品
-- 基于队列的异步系统
-- embedding 检索栈
-- 面向生产部署的平台
+- Dify 官方文档 ingestion、cleaning、snapshot persistence
+- 同一 `snapshot_version` 下的内容漂移拒绝覆盖
+- deterministic classification：`deployment`、`configuration`、`knowledge-base`、`integration`、`unclassified`
+- fixed-slot extraction：`deployment_method`、`version`、`error_message`、`environment`
+- manifest-guided local retrieval
+- `POST /v1/support/ask` 同步返回 `answered`、`needs_clarification` 或 `ticket_created`
+- `retrieval_hits` logging 和 SQLite ticket persistence
+- `GET /healthz` liveness 与 `GET /readyz` readiness 分离
+- replay eval runner 与版本控制内 eval cases
+- answered 路径的 optional OpenAI-compatible answer synthesis 入口
+- provider 失败或限流时的 deterministic fallback
 
-刻意不做的部分：
+## 主链如何决策
 
-- 不让主链强依赖外部模型提供方
-- 不做基于 LLM 的 classification 或 clarification
-- 不扩成多来源知识平台
-- 不做 memory 或长期会话状态
-- 不抽象多套 retrieval backend
+```text
+support question
+  -> deterministic classification
+  -> fixed-slot extraction
+  -> manifest-guided retrieval
+  -> decision
+       -> answered + citations
+       -> needs_clarification
+       -> ticket_created
+  -> support_runs / retrieval_hits / tickets
+```
 
-## Further Reading
+关键规则：
 
-- 架构说明：[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
-- 演示脚本：[`docs/DEMO_SCRIPT.md`](./docs/DEMO_SCRIPT.md)
-- 面试讲解素材：[`docs/INTERVIEW_NOTES.md`](./docs/INTERVIEW_NOTES.md)
-- 可安全写进简历的 bullet：[`docs/RESUME_BULLETS.md`](./docs/RESUME_BULLETS.md)
-- 当前实现范围与冻结规格：[`SPEC.md`](./SPEC.md)
+- `unclassified` 直接进入 `ticket_created`
+- deployment / configuration 问题缺少足够槽位时先进入 `needs_clarification`
+- knowledge-base / integration 的模糊故障描述会先澄清，不会因为检索有命中就强答
+- 同一请求链只允许一轮澄清；第二轮仍不足时进入 ticket
+- `/v1/support/ask` 不在请求路径里隐式抓文档或建索引；未 ready 时应先运行 ingest/index 命令
+
+## 工程证据
+
+这些入口可以直接对应当前 README 的能力描述：
+
+- API 入口、`/healthz`、`/readyz`：[`app/api/main.py`](./app/api/main.py)
+- support 主链和决策规则：[`app/support/service.py`](./app/support/service.py)
+- optional LLM answer synthesis client：[`app/llm/client.py`](./app/llm/client.py)
+- ingestion、cleaning、snapshot handling：[`app/ingest/`](./app/ingest/)
+- chunking、indexing、local retrieval：[`app/retrieval/`](./app/retrieval/)
+- SQLite schema：[`scripts/init_db.sql`](./scripts/init_db.sql)
+- support API integration tests：[`tests/integration/`](./tests/integration/)
+- replay eval runner：[`scripts/run_eval.py`](./scripts/run_eval.py)
+- eval cases：[`data/evals/support_eval_v1.yaml`](./data/evals/support_eval_v1.yaml)
+- demo script：[`docs/DEMO_SCRIPT.md`](./docs/DEMO_SCRIPT.md)
+- architecture notes：[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
+
+## 可选 LLM Answer Synthesis
+
+`answered` 路径支持一个可选的 OpenAI-compatible answer synthesis 入口。它只在检索证据已经足够、请求已经进入 `answered` 分支后尝试调用 LLM，用于把 retrieved evidence 组织成更自然的回答。
+
+当前约束：
+
+- classification 仍是 deterministic
+- clarification 和 ticket decision 不调用 LLM
+- citations 仍来自 retrieval hits
+- provider 成功时可返回 `answer_generation_mode = llm`
+- provider 失败、超时或限流时会回退到 `answer_generation_mode = deterministic_fallback`
+- 当前不声明 live provider success 已经稳定完成
+
+因此，这一能力应理解为可切换的回答生成增强，而不是完整 LLM Copilot 或 Agent orchestration。
+
+## 边界 / Non-goals
+
+这个仓库当前是一个 AI application prototype / Python backend service，用于演示 self-hosted Dify 支持分诊链路的最小工程闭环。
+
+当前没有实现：
+
+- 面向生产部署的完整支持平台
+- 前端或 dashboard
+- 多智能体编排
+- async worker / queue
+- embedding-based retrieval 或向量库基准
+- 复杂权限系统
+- 稳定验证完成的 live LLM provider path
+
+这些边界是刻意保留的。当前优先级是让支持链路可运行、可检查、可测试、可回放评测，而不是把项目扩成平台。
+
+## 进一步阅读
+
+- [Demo Script](./docs/DEMO_SCRIPT.md)
+- [Architecture](./docs/ARCHITECTURE.md)
+- [Interview Notes](./docs/INTERVIEW_NOTES.md)
+- [Resume Bullets](./docs/RESUME_BULLETS.md)
+- [Specification](./SPEC.md)
